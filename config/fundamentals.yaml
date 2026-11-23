@@ -1,0 +1,110 @@
+# Canonical fundamental metrics extracted from KAP XBRL financial reports (CLAUDE.md §3, §11).
+#
+# Formats = KAP statement taxonomies (detected from statement names, not from the ticker):
+#   tfrs      standard KAP TFRS set — industrial, holding, REIT, brokerage
+#   bank      BDDK set ("TFRS 9'a Göre Karşılık Ayrılmış"), incl. participation banks
+#   insurance SEDDK set ("Bilanço", "Gelir Tablosu", "Nakit Akım Tablosu")
+#
+# Metric spec:
+#   [concept, ...]        first concept present in the report wins (fallbacks for taxonomy variants)
+#   {sum: [concept, ...]} sum of the concepts present (missing lines = not presented = 0; NULL if none present)
+# Values are stored in TRY exactly as reported (expenses are negative). Ratios and derived metrics (EBITDA, net debt,
+# margins, P/E, P/B …) are computed point-in-time in analytics/, never here.
+# Data-driven choices (2026-11-21 profile of data/external/kapdata): coverage per metric is printed by the ingest.
+
+formats:
+  tfrs:
+    income:
+      revenue: [ifrs-full_Revenue]
+      cost_of_sales: [ifrs-full_CostOfSales]
+      gross_profit: [ifrs-full_GrossProfit]
+      marketing_expense: [kap-fr_MarketingExpense, ifrs-full_SellingExpense, ifrs-full_DistributionCosts]
+      admin_expense: [ifrs-full_AdministrativeExpense]
+      rnd_expense: [ifrs-full_ResearchAndDevelopmentExpense]
+      other_operating_income: [ifrs-full_OtherIncome]
+      other_operating_expense: [ifrs-full_OtherExpenseByFunction]
+      operating_profit: [ifrs-full_ProfitLossFromOperatingActivities]
+      finance_income: [ifrs-full_FinanceIncome]
+      finance_costs: [ifrs-full_FinanceCosts]
+      net_monetary_position: [ifrs-full_GainsLossesOnNetMonetaryPosition]
+      profit_before_tax: [ifrs-full_ProfitLossBeforeTax]
+      tax_expense: [ifrs-full_IncomeTaxExpenseContinuingOperations]
+      net_income: [ifrs-full_ProfitLoss]
+      net_income_parent: [ifrs-full_ProfitLossAttributableToOwnersOfParent]
+    cashflow:
+      depreciation_amortization: [ifrs-full_AdjustmentsForDepreciationAndAmortisationExpense]
+      operating_cash_flow: [ifrs-full_CashFlowsFromUsedInOperatingActivities]
+      capex:
+        - kap-fr_PurchaseOfPropertyPlantEquipmentAndIntangibleAssetsClassifiedAsInvestingActivities
+        - ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities
+      dividends_paid: [ifrs-full_DividendsPaidClassifiedAsFinancingActivities]
+    balance:
+      total_assets: [ifrs-full_Assets]
+      current_assets: [ifrs-full_CurrentAssets]
+      noncurrent_assets: [ifrs-full_NoncurrentAssets]
+      cash: [ifrs-full_CashAndCashEquivalents]
+      trade_receivables: [ifrs-full_CurrentTradeReceivables]
+      inventories: [ifrs-full_Inventories]
+      current_liabilities: [ifrs-full_CurrentLiabilities]
+      noncurrent_liabilities: [ifrs-full_NoncurrentLiabilities]
+      total_liabilities: [ifrs-full_Liabilities]
+      total_equity: [ifrs-full_Equity]
+      equity_parent: [ifrs-full_EquityAttributableToOwnersOfParent]
+      issued_capital: [ifrs-full_IssuedCapital]
+      # KAP "Borçlanmalar" lines include lease liabilities (TFRS 16) as sub-items. kap-fr_CurrentBorowings: sic.
+      financial_debt:
+        sum: [kap-fr_CurrentBorowings, kap-fr_CurrentPortionOfNoncurrentBorrowings, ifrs-full_LongtermBorrowings]
+
+  bank:
+    income:
+      interest_income: [kap-fr_InterestIncome, kap-fr_ProfitShareIncome]
+      interest_expense: [kap-fr_InterestExpenses]
+      net_interest_income: [kap-fr_InterestIncomeOrExpense, kap-fr_ProfitShareIncomeOrExpense]
+      net_fee_commission_income: [kap-fr_FeeAndCommissionIncomeOrExpenses]
+      trading_income: [kap-fr_TradingIncomeOrLoss]
+      gross_operating_profit: [kap-fr_GrossProfitLossFromOperatingActivitiesForBankingSector]
+      expected_credit_losses: [kap-fr_AllowanceExpensesForExpectedCreditLosses]
+      personnel_expense: [kap-fr_PersonnelExpenses]
+      other_operating_expense: [kap-fr_OtherOperatingExpenses]
+      operating_profit: [ifrs-full_ProfitLossFromOperatingActivities]
+      net_monetary_position: [ifrs-full_GainsLossesOnNetMonetaryPosition]
+      profit_before_tax: [ifrs-full_ProfitLossBeforeTax]
+      tax_expense: [ifrs-full_IncomeTaxExpenseContinuingOperations]
+      net_income: [ifrs-full_ProfitLoss]
+      net_income_parent: [ifrs-full_ProfitLossAttributableToOwnersOfParent]
+    balance:
+      total_assets: [ifrs-full_Assets]
+      cash: [ifrs-full_CashAndCashEquivalents]
+      loans: [kap-fr_Loans]
+      deposits: [kap-fr_Deposits, kap-fr_ParticipationFunds]
+      total_equity: [ifrs-full_Equity]
+      issued_capital: [ifrs-full_IssuedCapital]
+
+  insurance:
+    income:
+      gross_written_premiums:
+        sum:
+          - kap-fr_GrossWrittenPremiumsClassifiedAsNonlifeTechnicalIncome
+          - kap-fr_GrossWrittenPremiumsClassifiedAsLifeTechnicalIncome
+      technical_balance: [kap-fr_TechnicalPartBalance]
+      investment_income: [ifrs-full_InvestmentIncome]
+      profit_before_tax: [ifrs-full_ProfitLossBeforeTax]
+      net_income: [ifrs-full_ProfitLoss]
+      net_income_parent: [ifrs-full_ProfitLossAttributableToOwnersOfParent]
+    cashflow:
+      operating_cash_flow: [ifrs-full_CashFlowsFromUsedInOperatingActivities]
+    balance:
+      total_assets: [ifrs-full_Assets]
+      current_assets: [ifrs-full_CurrentAssets]
+      cash: [ifrs-full_CashAndCashEquivalents]
+      current_liabilities: [ifrs-full_CurrentLiabilities]
+      total_equity: [ifrs-full_Equity]
+      issued_capital: [kap-fr_NominalCapital, ifrs-full_IssuedCapital]
+
+# Metrics used to detect TMS 29 restatement: prior-period column of a report vs the value first reported for that
+# period. Restated (ratio > threshold) => the report is inflation-adjusted. First metric available wins.
+tms29_detection:
+  metrics: [revenue, interest_income, gross_written_premiums, total_assets]
+  restated_ratio: 1.03
+  unchanged_tolerance: 0.005
+  first_application_period_end: "2023-12-31"

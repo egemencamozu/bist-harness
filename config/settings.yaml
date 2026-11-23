@@ -1,0 +1,43 @@
+# Global settings. Paths are relative to the project root.
+paths:
+  db: data/db/bist.sqlite
+  raw: data/raw
+  external:
+    price_scraper_output: ../FinTreX/price-scraper/output
+    price_scraper_batches: [bist_1, bist_2, bist_3, bist_4]   # *_eski folders are stale and never read
+    quiz_data: ../quiz1/data
+    bist100_changes: ../FinTreX/YF/bist100_changes.csv
+    kapdata: data/external/kapdata
+    news_bloomberght: ../FinTreX/haber-scrapper/gecmis/local-pilot/sources   # bloomberg_ht_6_YYYY-MM.json
+
+dates:
+  warmup_start: "2023-01-01"     # indicator warm-up (Ichimoku 52+26, SMA200)
+  analysis_start: "2024-01-01"
+  analysis_end: "2026-11-20"
+  golden_as_of: "2026-09-10"
+
+horizons: [1, 3, 5, 10, 20]
+
+thresholds:
+  small_sample: 10               # n < 10  -> SMALL_SAMPLE
+  insufficient_sample: 5         # n < 5   -> INSUFFICIENT_SAMPLE
+  small_sector_group: 3          # members < 3 -> SMALL_SECTOR_GROUP
+  suspicious_jump: 0.105         # |adjusted daily return| above BIST ~10% price band -> SUSPICIOUS_JUMP
+  broken_jump: 0.30              # |adjusted daily return| above this -> BROKEN_PRICE_SERIES (hard block)
+  stale_run_days: 5              # identical closes with volume for N days -> STALE_PRICE
+  source_disagreement: 0.01      # |ret_primary - ret_secondary| above this -> SOURCE_DISAGREEMENT
+  calendar_majority: 0.80        # share of tickers with a bar for a day to count as a trading day
+
+corporate_actions:
+  min_log_change: 0.003          # cum_factor changes larger than this are recorded as corporate actions
+
+tms29:
+  consistent_from: "2025-01-01"
+
+session:
+  timezone: Europe/Istanbul
+  close_time: "18:10"            # disclosures after this count as after-close
+
+determinism:
+  float_decimals: 6
+  seed: 42

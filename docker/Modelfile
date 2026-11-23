@@ -1,0 +1,6 @@
+FROM /models/bist-4b-q8_0.gguf
+RENDERER qwen3.5
+PARSER qwen3.5
+PARAMETER temperature 0
+PARAMETER seed 42
+PARAMETER num_ctx 4096

@@ -1,0 +1,97 @@
+# Study universe and sector map.
+# Switching the analysed universe to the TÜBİTAK set is a one-line change: active_universe: tubitak_95
+version: 1
+active_universe: course_30
+benchmark: XU100
+
+benchmarks:
+  XU100: {yahoo: XU100.IS, kind: index}
+
+# TÜBİTAK 2209-A / FinTreX 95-ticker sector map. Used as the default peer groups for sector-relative analysis.
+peer_groups:
+  Bankacilik: [AKBNK, GARAN, ISCTR, YKBNK, VAKBN, HALKB, TSKB, ALBRK]
+  Sigorta_Araci_Kurum: [TURSG, ANSGR, ANHYT, ISMEN]
+  Holding_Yatirim: [KCHOL, SAHOL, ALARK, AGHOL, DOHOL, TKFEN, BERA, ECZYT, GLYHO, BRYAT]
+  Bilisim_Yazilim: [LOGO, MIATK, ARDYZ]
+  Demir_Celik_Boru: [EREGL, KRDMD, ISDMR, CEMTS, BRSAN]
+  Insaat_Yapi_Malzemeleri: [ENKAI, SISE, CIMSA, AKCNS, OYAKC, BTCIM, NUHCM]
+  GYO: [EKGYO, TRGYO, SNGYO, ISGYO, ALGYO]
+  Otomotiv_YanSanayi: [FROTO, TOASO, DOAS, TTRAK, OTKAR, KARSN, EGEEN, BRISA, GOODY, JANTS]
+  Dayanikli_Tuketim: [ARCLK, VESTL, VESBE]
+  Enerji: [ENJSA, AKSEN, AYGAZ, ODAS, ZOREN, GWIND, CANTE, GESAN, AYEN, AKENR]
+  Petrokimya_Endustri: [TUPRS, PETKM, SASA, AKSA, KORDS]
+  Tarim_Gubre: [GUBRF, HEKTS, EGGUB]
+  Gida_Icecek: [CCOLA, AEFES, ULKER, TUKAS, TATGD]
+  Perakende: [BIMAS, MGROS, SOKM, MAVI]
+  Havacilik_Lojistik: [THYAO, PGSUS, TAVHL, RYSAS, CLEBI]
+  Savunma_Makine: [ASELS, KATMR]
+  Telekomunikasyon: [TCELL, TTKOM]
+  Saglik_Ilac: [MPARK, ECILC, SELEC, DEVA]
+  # Course-only group (TRALT is not in the 95-ticker map) -> SMALL_SECTOR_GROUP warning.
+  Madencilik: [TRALT]
+
+# Fundamental template + TMS 29 applicability, per peer group (default: industrial, tms29_applies: true).
+group_defaults:
+  Bankacilik: {template: bank, tms29_applies: false}            # BDDK: banks do not apply TMS 29
+  Sigorta_Araci_Kurum: {template: insurance, tms29_applies: false}  # SEDDK: not applied (verified in KAP data 2026-11-21)
+  Holding_Yatirim: {template: holding}
+  GYO: {template: reit}
+
+ticker_overrides:
+  ISMEN: {template: brokerage, tms29_applies: true}   # SPK-regulated intermediary
+  TRALT: {aliases: [KOZAL]}                           # Koza Altın ticker change — yfinance history TO VERIFY
+  # Functional currency is not TRY: KAP comparatives are never inflation-restated (detected by the fundamentals
+  # ingest, kap.detect_tms29, 2026-11-21). TL statements are translations, so TL growth mixes FX moves.
+  BRSAN: {tms29_applies: false}
+  BRYAT: {tms29_applies: false}
+  CLEBI: {tms29_applies: false}
+  ENKAI: {tms29_applies: false}
+  EREGL: {tms29_applies: false}
+  ISDMR: {tms29_applies: false}
+  KORDS: {tms29_applies: false}
+  PGSUS: {tms29_applies: false}
+  TAVHL: {tms29_applies: false}
+  THYAO: {tms29_applies: false}
+
+# Simplified sector labels from the course specification (reporting only).
+course_sectors:
+  ASELS: Technology / Defense
+  TUPRS: Petroleum / Refining
+  BIMAS: Retail Trade
+  THYAO: Transportation / Airlines
+  AKBNK: Banking
+  KCHOL: Holding / Investment
+  EREGL: Basic Metals / Steel
+  TCELL: Telecommunications
+  CCOLA: Food & Beverage
+  MGROS: Retail Trade
+  SASA: Chemicals / Plastics
+  TRALT: Mining
+  FROTO: Automotive
+  ENKAI: Construction
+  PGSUS: Transportation / Airlines
+  MPARK: Healthcare
+  EKGYO: Real Estate Investment Trust
+  GUBRF: Chemicals / Fertilizer
+  TURSG: Insurance
+  ENJSA: Electric Utilities
+  TTKOM: Telecommunications
+  OYAKC: Cement
+  AKSEN: Electric Utilities
+  ISMEN: Brokerage / Capital Markets
+  ARCLK: Durables / Machinery
+  ECILC: Healthcare / Pharmaceuticals
+  MAVI: Retail / Apparel
+  PETKM: Petrochemicals
+  TOASO: Automotive
+  KRDMD: Basic Metals / Steel
+
+universes:
+  course_30:
+    tickers: [ASELS, TUPRS, BIMAS, THYAO, AKBNK, KCHOL, EREGL, TCELL, CCOLA, MGROS,
+              SASA, TRALT, FROTO, ENKAI, PGSUS, MPARK, EKGYO, GUBRF, TURSG, ENJSA,
+              TTKOM, OYAKC, AKSEN, ISMEN, ARCLK, ECILC, MAVI, PETKM, TOASO, KRDMD]
+  tubitak_95:
+    groups: [Bankacilik, Sigorta_Araci_Kurum, Holding_Yatirim, Bilisim_Yazilim, Demir_Celik_Boru,
+             Insaat_Yapi_Malzemeleri, GYO, Otomotiv_YanSanayi, Dayanikli_Tuketim, Enerji, Petrokimya_Endustri,
+             Tarim_Gubre, Gida_Icecek, Perakende, Havacilik_Lojistik, Savunma_Makine, Telekomunikasyon, Saglik_Ilac]

@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "note": "Leakage guard (CLAUDE.md §9). No training example may use an as_of date within `min_gap_trading_days` trading days of any reserved date, nor any golden case. The held-out set measures generalisation to unseen dates, tickers and phrasings.",
+  "golden_as_of": "2026-09-10",
+  "heldout_as_of": ["2025-05-16", "2025-11-14", "2026-04-17"],
+  "min_gap_trading_days": 25
+}

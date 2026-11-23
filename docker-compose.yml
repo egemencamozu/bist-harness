@@ -1,0 +1,54 @@
+# docker compose up --build   ->  UI at http://localhost:8501   (README.md)
+#
+# The harness only talks to an Ollama on 127.0.0.1 (CLAUDE.md §1.1, cloud/remote inference is refused). The app
+# therefore shares the ollama container's network namespace: inside it, Ollama IS localhost. Port 11434 is not
+# published; only the UI port is.
+services:
+  ollama:
+    image: ollama/ollama:0.40.17   # same version the results were measured with (reproducible greedy output)
+    ports:
+      - "8501:8501"                # the app's UI (app runs in this network namespace)
+    volumes:
+      - ollama:/root/.ollama
+      - ./models:/models:ro
+      - ./docker:/docker:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  model-init:
+    image: ollama/ollama:0.40.17
+    network_mode: "service:ollama"
+    environment:
+      OLLAMA_HOST: "127.0.0.1:11434"
+    volumes:
+      - ./models:/models:ro
+      - ./docker:/docker:ro
+    entrypoint: ["/bin/sh", "/docker/create-model.sh"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: bistharness:latest
+    network_mode: "service:ollama"
+    volumes:
+      - ./data/db:/app/data/db     # bist.sqlite (read) + episodic.sqlite (analysis log, written)
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+
+volumes:
+  ollama:

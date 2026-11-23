@@ -1,0 +1,178 @@
+# Procedural memory of the harness (CLAUDE.md §7, §8): workflow order, tool permissions, mandatory states,
+# validation rules, evidence selection and the deterministic decision policy. Changing this file changes the
+# policy hash recorded with every analysis.
+version: 1
+
+states:
+  - START
+  - SELECT_UNIVERSE
+  - LOAD_MARKET_DATA
+  - CHECK_DATA_QUALITY
+  - CALCULATE_TECHNICALS
+  - RUN_SECTOR_RELATIVE_ANALYSIS
+  - RUN_PATTERN_AND_REVERSAL_ANALYSIS
+  - LOAD_FUNDAMENTALS
+  - LOAD_MACRO_CONTEXT
+  - LOAD_NEWS_AND_SPEECH_CONTEXT
+  - BUILD_EVIDENCE
+  - PREVIEW_STRATEGIES
+  - RUN_BACKTEST
+  - RISK_GATE
+  - GENERATE_EXPLANATION
+  - HUMAN_REVIEW
+  - LOG_AND_CLOSE
+
+mandatory: [CHECK_DATA_QUALITY, RUN_BACKTEST, RISK_GATE]
+
+# Tools only the harness itself may call outside their state (finalising the evidence bundle after RUN_BACKTEST
+# and RISK_GATE). A planner/LLM proposal is always checked against `permissions`.
+harness_internal: [build_evidence_bundle]
+
+permissions:
+  START: []
+  SELECT_UNIVERSE: []
+  LOAD_MARKET_DATA: [get_stock_history, get_index_history]
+  CHECK_DATA_QUALITY: [check_data_quality]
+  CALCULATE_TECHNICALS: [calculate_indicators, find_support_resistance]
+  RUN_SECTOR_RELATIVE_ANALYSIS: [rank_sector_relative_strength]
+  RUN_PATTERN_AND_REVERSAL_ANALYSIS: [detect_reversal_events, test_weekday_pattern, find_support_resistance]
+  LOAD_FUNDAMENTALS: [get_fundamental_metrics, calculate_fundamental_change]
+  LOAD_MACRO_CONTEXT: [get_macro_context]
+  LOAD_NEWS_AND_SPEECH_CONTEXT: [get_news_events, get_speech_features]
+  BUILD_EVIDENCE: [build_evidence_bundle]
+  PREVIEW_STRATEGIES: [run_backtest]
+  RUN_BACKTEST: [run_backtest]
+  RISK_GATE: [check_data_quality]
+  GENERATE_EXPLANATION: []
+  HUMAN_REVIEW: []
+  LOG_AND_CLOSE: []
+
+# States a scenario does not need are logged SKIPPED_NOT_APPLICABLE with this reason (mandatory ones never are).
+not_applicable:
+  S1_SECTOR_CATCH_UP:
+    RUN_PATTERN_AND_REVERSAL_ANALYSIS: "S1 geride kalma sorusu; dönüş/örüntü analizi kapsam dışı"
+  S2_WEEKDAY_PATTERN:
+    CALCULATE_TECHNICALS: "S2 yalnız günlük getiri dizisini kullanır"
+    RUN_SECTOR_RELATIVE_ANALYSIS: "S2 tek hisse takvim örüntüsü"
+    LOAD_FUNDAMENTALS: "S2 takvim örüntüsü; temel veri kullanılmaz"
+    LOAD_MACRO_CONTEXT: "S2 sorusu makro koşul içermiyor"
+    LOAD_NEWS_AND_SPEECH_CONTEXT: "S2 sorusu haber bağlamı içermiyor"
+    PREVIEW_STRATEGIES: "tek örüntü stratejisi; varyant ön izlemesi yok"
+  S3_TECHNICAL_REVERSAL:
+    RUN_SECTOR_RELATIVE_ANALYSIS: "S3 tek hisse teknik dönüş sorusu"
+    LOAD_FUNDAMENTALS: "S3 teknik olay istatistiği; temel veri kullanılmaz"
+    LOAD_MACRO_CONTEXT: "S3 sorusu makro koşul içermiyor"
+  S4_FUNDAMENTAL_REACTION:
+    RUN_SECTOR_RELATIVE_ANALYSIS: "sektör anormal getirisi S4 aracında hesaplanır"
+    RUN_PATTERN_AND_REVERSAL_ANALYSIS: "S4 bilanço tepkisi sorusu"
+  SAFETY_ADVICE_REQUEST:
+    CALCULATE_TECHNICALS: "tavsiye talebi: teknik sinyal üretilmez"
+    RUN_SECTOR_RELATIVE_ANALYSIS: "tavsiye talebi"
+    RUN_PATTERN_AND_REVERSAL_ANALYSIS: "tavsiye talebi"
+    LOAD_FUNDAMENTALS: "iddia kur ilişkisiyle sınanır"
+    PREVIEW_STRATEGIES: "tavsiye talebi: strateji ön izlemesi yok"
+
+# Backtest variant used in RUN_BACKTEST per scenario (PREVIEW_STRATEGIES runs ALL).
+backtest_variant:
+  S1_SECTOR_CATCH_UP: B_TECH_SECTOR
+  S2_WEEKDAY_PATTERN: A_TECH
+  S3_TECHNICAL_REVERSAL: A_TECH
+  S4_FUNDAMENTAL_REACTION: C_TECH_SECTOR_FUND
+  SAFETY_ADVICE_REQUEST: A_TECH
+backtest_split_date: "2026-01-01"
+
+# Committed evidence selection (fnmatch globs; {t} = each analysed ticker). Order = E# order.
+evidence:
+  max_committed: 16
+  always: ["gate.result"]
+  S1_SECTOR_CATCH_UP:
+    - "sector.*.strength.w*"
+    - "sector.*.{t}.lag.w*"
+    - "sector.*.catch_up.h*"
+    - "sector.*.{t}.persistent_lag"
+    - "fundamental_change.{t}.*.ebitda_margin"
+    - "fundamental_change.{t}.*.net_margin"
+    - "fundamental_change.{t}.excluded.*"
+    - "macro.USDTRY.latest"
+    - "macro.TCMB_POLICY_RATE.latest"
+    - "backtest.B_TECH_SECTOR"
+    - "backtest.B_TECH_SECTOR.out_of_sample"
+  S2_WEEKDAY_PATTERN:
+    - "weekday.{t}.in_sample"
+    - "weekday.{t}.out_of_sample"
+    - "weekday.{t}.stability"
+    - "weekday.{t}.in_sample.full_sequence"
+    - "weekday.{t}.*.sequence"
+    - "backtest.A_TECH"
+    - "backtest.A_TECH.out_of_sample"
+  S3_TECHNICAL_REVERSAL:
+    - "reversal.{t}.BB_LOWER_TOUCH.h*"
+    - "reversal.{t}.BB_LOWER_REVERSAL.h*"
+    - "reversal.{t}.BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE.h*"
+    - "reversal.{t}.BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD.h*"
+    - "reversal.{t}.combo_comparison"
+    - "reversal.{t}.active_now"
+    - "reversal.{t}.excluded_incomplete"
+    - "indicators.{t}.trend_state"
+    - "support_resistance.{t}.nearest_support"
+    - "backtest.A_TECH"
+    - "backtest.A_TECH.out_of_sample"
+  S4_FUNDAMENTAL_REACTION:
+    - "fundamentals.{t}.latest_report"
+    - "fundamentals.{t}.*.yoy_ytd"
+    - "fundamental_change.{t}.*.ebitda_margin"
+    - "fundamental_change.{t}.*.net_debt_to_ebitda"
+    - "fundamental_change.{t}.*.reaction.h*"
+    - "fundamental_change.{t}.aggregate.h*"
+    - "fundamental_change.{t}.by_direction.h*"
+    - "fundamental_change.{t}.excluded.*"
+    - "backtest.C_TECH_SECTOR_FUND"
+  SAFETY_ADVICE_REQUEST:
+    - "macro.{t}.USDTRY.relationship"
+    - "macro.USDTRY.latest"
+    - "history.{t}.period_return"
+    - "news.{t}.count"
+    - "backtest.A_TECH"
+
+# Output validation (harness/validator.py).
+validation:
+  max_attempts: 2               # first answer + one correction attempt, then the deterministic ANALYSIS_UNSAFE template
+  require_citation: true        # at least one E# cited
+  candidate_needs_backtest: true  # *_CANDIDATE actions must cite a backtest.* evidence
+  forbidden_patterns:           # case-insensitive regexes, checked on the model's own text
+    - "hedef fiyat"
+    - "\\b(al|sat)(ın|ınız|ayım|abilirsin|abilirsiniz|malısın|malısınız)\\b"
+    - "\\balın\\b|\\balınız\\b|\\bsatın al\\b"
+    - "kesin(likle)?\\s+(yüksel|art|kazandır|çık)"
+    - "garanti(?:si|li|siz)?\\b(?!\\s*(etmez|etmemekte|edilmez|edilemez|değil|vermez|vermemekte|yok|olmadığ|sunmaz|sunmamakta|içermez|anlamına gelmez))"   # negated disclaimers are allowed
+    - "tavsiye ederim|öneririm|tavsiyem"
+    - "\\b(buy|sell|target price|stop[- ]?loss)\\b"
+    - "zarar kes"
+  allowed_phrases:              # removed before the regex check (they contain forbidden substrings legitimately)
+    - "satın alma gücü"
+    - "satın alma güçleri"
+  refusal_template: >-
+    Bu sistem eğitsel bir araştırma aracıdır: yatırım tavsiyesi, al/sat önerisi, hedef fiyat veya getiri garantisi
+    vermez. Aşağıda yalnızca sorudaki iddianın geçmiş veriyle sınanması yer alır.
+  disclaimer: >-
+    Bu çıktı eğitsel bir analizdir; geçmiş sonuçlar gelecekteki getirinin göstergesi değildir ve yatırım
+    tavsiyesi değildir.
+  unsafe_template: >-
+    Analiz güvenli biçimde tamamlanamadı ({reason}). Sistem bu nedenle bir sonuç önermez; kanıtlar ve risk kapısı
+    çıktısı inceleme için kayıtlıdır.
+
+# Deterministic decision policy (the template explainer / training teacher; the LLM decides on its own).
+decision:
+  min_events: 10                # historical statistic needs at least this many events
+  max_p_adjusted: 0.10          # BH-adjusted p-value threshold for "historically supported"
+  min_hit_rate_edge: 0.05       # catch-up hit rate must beat the non-laggard baseline by this much
+
+llm:
+  host: "http://127.0.0.1:11434"   # local only: any non-local host is refused (CLAUDE.md §1.1)
+  model: "bist-analist"   # our Qwen3.5-4B QLoRA (training/, GGUF sha256 747068ad…); base comparison: eval.bakeoff
+  thinking_models: ["qwen3", "qwen3.5", "bist-analist"]   # think=false (JSON only); bist-analist = our Qwen3.5-4B QLoRA
+  fresh: true     # cold call per request: identical prompts give identical outputs (KV-cache reuse does not)
+  # num_ctx 4096 fits the 8 GB laptop GPU (8192 spills ~30% to CPU). Penalties are pinned to neutral so every model
+  # decodes identically (pure greedy): Ollama's qwen3.5 Modelfiles ship presence_penalty 1.5, which discourages
+  # re-using tokens (digits) that must be copied verbatim from the evidence.
+  options: {temperature: 0.0, seed: 42, num_ctx: 4096, presence_penalty: 0.0, frequency_penalty: 0.0, repeat_penalty: 1.0}

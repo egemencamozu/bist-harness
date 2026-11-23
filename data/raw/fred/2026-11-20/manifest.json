@@ -1,0 +1,17 @@
+{
+  "source": "fred",
+  "snapshot": "2026-11-20",
+  "created_at_utc": "2026-11-21T03:06:57Z",
+  "params": {
+    "urls": {
+      "DFEDTARU.csv": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFEDTARU",
+      "DFEDTARL.csv": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFEDTARL"
+    },
+    "downloaded_for_snapshot": "2026-11-20"
+  },
+  "files": {
+    "DFEDTARL.csv": "577c312570e9e58d5f8d8d7c4930d6b5d8b382860c93b2b3d04aa0691313055c",
+    "DFEDTARU.csv": "df6d4727d44708fafec81202b144d1dc39473b9926acd86c23025d63c01c327a"
+  },
+  "content_sha256": "73da2c7ccec35c5a824767ffba2a5e2136aabed28c900d0b010569bed84f5797"
+}

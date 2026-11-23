@@ -1,0 +1,72 @@
+{
+  "jobs": 3500,
+  "job_errors": {},
+  "examples": 10596,
+  "by_split_skill": {
+    "train/explanation": 3154,
+    "train/intent": 3555,
+    "train/planning": 2854,
+    "val/explanation": 346,
+    "val/intent": 388,
+    "val/planning": 299
+  },
+  "explanation_by_scenario": {
+    "S2_WEEKDAY_PATTERN": 545,
+    "SAFETY_ADVICE_REQUEST": 641,
+    "S4_FUNDAMENTAL_REACTION": 826,
+    "S1_SECTOR_CATCH_UP": 738,
+    "S3_TECHNICAL_REVERSAL": 750
+  },
+  "explanation_by_action": {
+    "REJECT_SIGNAL": 798,
+    "WATCH": 1605,
+    "HOLD": 489,
+    "INVESTIGATE": 596,
+    "FUNDAMENTAL_IMPROVEMENT_CANDIDATE": 8,
+    "TECHNICAL_REVERSAL_CANDIDATE": 4
+  },
+  "explanation_by_gate": {
+    "PASS_WITH_WARNINGS": 2093,
+    "INVESTIGATE": 1398,
+    "PASS": 9
+  },
+  "train_dates": [
+    "2024-07-01",
+    "2024-08-05",
+    "2024-08-21",
+    "2024-09-09",
+    "2024-09-25",
+    "2024-10-11",
+    "2024-11-15",
+    "2024-12-03",
+    "2024-12-19",
+    "2025-01-07",
+    "2025-01-23",
+    "2025-02-10",
+    "2025-02-26",
+    "2025-04-03",
+    "2025-07-25",
+    "2025-08-12",
+    "2025-08-28",
+    "2025-09-15",
+    "2025-10-01",
+    "2025-12-30",
+    "2026-01-16",
+    "2026-02-03",
+    "2026-02-19",
+    "2026-03-09",
+    "2026-06-15",
+    "2026-07-01",
+    "2026-07-20",
+    "2026-08-05",
+    "2026-11-03",
+    "2026-11-19"
+  ],
+  "val_dates": [
+    "2024-07-18",
+    "2024-10-30",
+    "2025-03-14",
+    "2025-07-08"
+  ],
+  "distinct_tickers": 96
+}

@@ -1,0 +1,163 @@
+{
+  "source": "news_bloomberght",
+  "snapshot": "2026-11-20",
+  "created_at_utc": "2026-11-21T03:07:12Z",
+  "params": {
+    "source_files": {
+      "bloomberg_ht_6_2023-10.json": {
+        "bytes": 3401787,
+        "sha256": "c0ce5e35fc66a64c0c49922cd95a3cf864eb51bdf02363533d21fba0ba06a228"
+      },
+      "bloomberg_ht_6_2023-11.json": {
+        "bytes": 3670192,
+        "sha256": "3dcaefde8d9c2df94bbfc67c908090646f066702e15b65a2f28892f5b9878854"
+      },
+      "bloomberg_ht_6_2023-12.json": {
+        "bytes": 2995571,
+        "sha256": "1bdd691bad5123cd46ec96a91889ae91ebe029e6e376b1f609cb078210addd5b"
+      },
+      "bloomberg_ht_6_2024-01.json": {
+        "bytes": 2988807,
+        "sha256": "31a40da3e17c7aabe57f4ecc269b6510819b56ff4c0f18646aa13b22b715fb79"
+      },
+      "bloomberg_ht_6_2024-02.json": {
+        "bytes": 2986824,
+        "sha256": "e214e814ab73f0898c1a8248d82997b1fed8373b9186748c2936257cb8310add"
+      },
+      "bloomberg_ht_6_2024-03.json": {
+        "bytes": 2999020,
+        "sha256": "539b10e2035c0b875a25a1e5d914ecc7340793af706b2c76110180d4fdc631ff"
+      },
+      "bloomberg_ht_6_2024-04.json": {
+        "bytes": 2968915,
+        "sha256": "36102e32cf67e09d556bb2cd0f5cd87419812f6cce2351c12b129aa41f2c3f7d"
+      },
+      "bloomberg_ht_6_2024-05.json": {
+        "bytes": 3481459,
+        "sha256": "386d939ba3756245134edaaf54bd19f756b71ca36a44f73bfd46954ae0e46025"
+      },
+      "bloomberg_ht_6_2024-06.json": {
+        "bytes": 2611527,
+        "sha256": "4ab42badf82672b06099f12f63db31ab58a4328d077bcad168baca3e45d8651e"
+      },
+      "bloomberg_ht_6_2024-07.json": {
+        "bytes": 3503503,
+        "sha256": "7c2b0229b3d0908c281253836d51dc652b2d620e4b28eed5cc8efb7084a749c9"
+      },
+      "bloomberg_ht_6_2024-08.json": {
+        "bytes": 3084049,
+        "sha256": "0977357810e31200774a8975cc9e136053f5bf30a43cbd5d3c0671d32c8395a7"
+      },
+      "bloomberg_ht_6_2024-09.json": {
+        "bytes": 3321379,
+        "sha256": "86ac0e177f2075aca3ca64f3287ec128b646201ff412972669de35e0bce0a2da"
+      },
+      "bloomberg_ht_6_2024-10.json": {
+        "bytes": 3831457,
+        "sha256": "71dc74debd554031da2125bb711cebb32fd847c836747daa19381dc13c8ec779"
+      },
+      "bloomberg_ht_6_2024-11.json": {
+        "bytes": 4117423,
+        "sha256": "78e763e9764f5219c4cba17fdbc6cb6920820caef24f9f9dfbf9ba659e6f73c9"
+      },
+      "bloomberg_ht_6_2024-12.json": {
+        "bytes": 3989556,
+        "sha256": "f8cd0fa4463bd2bc2da1946b75cd33f8e304bbb03df7565bbfa5197e699832f4"
+      },
+      "bloomberg_ht_6_2025-01.json": {
+        "bytes": 4197996,
+        "sha256": "95075e7ff2e24cc19b61d8a5e18e026431b437782eb2abf0a14423f14960104f"
+      },
+      "bloomberg_ht_6_2025-02.json": {
+        "bytes": 3998809,
+        "sha256": "b29113316f2045eaec6df4fe9cf1b1ad3cba5b5bdeed9ebfe454fc2ad92f7a4b"
+      },
+      "bloomberg_ht_6_2025-03.json": {
+        "bytes": 3549871,
+        "sha256": "dab8163624994260f43be5848c70a9521287bc374ef047c50790e71f9715ea21"
+      },
+      "bloomberg_ht_6_2025-04.json": {
+        "bytes": 3381299,
+        "sha256": "cb7b5bcc855de164a4ec886ba758f6b19fbf73ddf8c8e26a690862b18da2bee2"
+      },
+      "bloomberg_ht_6_2025-05.json": {
+        "bytes": 3490835,
+        "sha256": "b32190d4413c71fcafbef6ba4ccdda12891e6eb3d091a370a5b6d9df8955ebae"
+      },
+      "bloomberg_ht_6_2025-06.json": {
+        "bytes": 3383813,
+        "sha256": "3c7de71355b33f0d3ff2d3c88f6b736661876dfb0fdf4d069b236d6d308d222e"
+      },
+      "bloomberg_ht_6_2025-07.json": {
+        "bytes": 3463573,
+        "sha256": "5d299f0a6ef697e4e47041d58ba9178c75073b7dcc7bfc750424a834bf46359f"
+      },
+      "bloomberg_ht_6_2025-08.json": {
+        "bytes": 3300064,
+        "sha256": "3be00488da1d8210891eb9781a07c306cb641a7a5d58d0464a949f53962d0422"
+      },
+      "bloomberg_ht_6_2025-09.json": {
+        "bytes": 3403181,
+        "sha256": "7d8382ee8ee7a4ec0ae3e66dc667414afedc6ccfb22f2b3a282a12572e18503c"
+      },
+      "bloomberg_ht_6_2025-10.json": {
+        "bytes": 3531257,
+        "sha256": "4f1e49ed822ccbd174e94b62640a8ec593cef652026cccb5426b8e9a85d36fa3"
+      },
+      "bloomberg_ht_6_2025-11.json": {
+        "bytes": 3518688,
+        "sha256": "54ce115bde764282c557f2dd7825bfa39d6e392e512f0948d7d31d41f97b40ce"
+      },
+      "bloomberg_ht_6_2025-12.json": {
+        "bytes": 4441791,
+        "sha256": "9431d886a0ec1e19d994008905477d9f37dc63847c57d842246d96860b0483cc"
+      },
+      "bloomberg_ht_6_2026-01.json": {
+        "bytes": 4836870,
+        "sha256": "939cbb867c2b7381f283a1b7da3f1dfcbfd5c1a4aef5b8a9225d415c280e7ebb"
+      },
+      "bloomberg_ht_6_2026-02.json": {
+        "bytes": 4527892,
+        "sha256": "0556d4b45a2e620fe11752ef73c1f79b523d4e9124b6ec40ac5a9e0904dcda8f"
+      },
+      "bloomberg_ht_6_2026-03.json": {
+        "bytes": 4817360,
+        "sha256": "1a05ba6a34e1976c7e2a164f0ad8f3deb661d7a121ed921a86f6b1e37988c1a3"
+      },
+      "bloomberg_ht_6_2026-04.json": {
+        "bytes": 4354103,
+        "sha256": "56264d77a789bcc4eb231209cd7d32ffb8da58ef4eff194785fd6b48f17f33b0"
+      },
+      "bloomberg_ht_6_2026-05.json": {
+        "bytes": 3540138,
+        "sha256": "477e646841be753cdce0ba538f8fa65cba6c01197a6cf5023606c757d40f49f5"
+      },
+      "bloomberg_ht_6_2026-06.json": {
+        "bytes": 4736780,
+        "sha256": "e0b90c83ed85ac6a54d354e46fef6b1ddaa0986ffc367168d90ab5414f74c2b7"
+      },
+      "bloomberg_ht_6_2026-07.json": {
+        "bytes": 4778046,
+        "sha256": "cdff42413e7b6aa7f52454286378b82f8809f785a069691f96914a940c1503c0"
+      },
+      "bloomberg_ht_6_2026-08.json": {
+        "bytes": 4328779,
+        "sha256": "3c4a661d0892c5ce9aaab0a131a41fa7fc227f952ca0cfeef5aca7641299ecad"
+      },
+      "bloomberg_ht_6_2026-09.json": {
+        "bytes": 4993537,
+        "sha256": "70557d194df1463cefd88c06cce4d5f2a387fa3af5a55d963646b434729ce652"
+      },
+      "bloomberg_ht_6_2026-10.json": {
+        "bytes": 2448404,
+        "sha256": "bdc7ad13fd05d97ced032c768c767a9ae3259821aa052ddf2d8197d655e298ff"
+      }
+    },
+    "articles": 40780,
+    "knowledge_time_rule": "max(page_published_at, page_modified_at, published_at) in Europe/Istanbul"
+  },
+  "files": {
+    "articles.jsonl.gz": "8b0677777d585f89b55b2ccc269282d99d7b2f8d0c9353d72d44741b295ff3cb"
+  },
+  "content_sha256": "1dbaaa4a9de2afec9e637ba3de687c6885f733e34bbc327fcc04b28ad6b19fcd"
+}

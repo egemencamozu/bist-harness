@@ -1,0 +1,17 @@
+{
+  "source": "tcmb_rates",
+  "snapshot": "2026-11-20",
+  "created_at_utc": "2026-11-21T03:02:07Z",
+  "params": {
+    "urls": {
+      "one_week_repo.html": "https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Main+Menu/Temel+Faaliyetler/Para+Politikasi/Merkez+Bankasi+Faiz+Oranlari/1+Hafta+Repo",
+      "cpi.html": "https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Main+Menu/Istatistikler/Enflasyon+Verileri/Tuketici+Fiyatlari"
+    },
+    "downloaded_for_snapshot": "2026-11-20"
+  },
+  "files": {
+    "cpi.html": "ea88aaf0c63d21f6697919abce91dd1ae46a2516004e9eb487369e13f510b863",
+    "one_week_repo.html": "cb26cb14c55687126668d5e0c264a4185ce217a0d20b11c56b0227d84d6a87fb"
+  },
+  "content_sha256": "d2a358657e1b7f530962f0064c648e77b403fcca01fc72be4d501c2ae3f62809"
+}

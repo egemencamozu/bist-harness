@@ -1,0 +1,50 @@
+{
+  "source": "kap",
+  "snapshot": "2026-11-20",
+  "created_at_utc": "2026-11-21T02:31:50Z",
+  "params": {
+    "origin": "data/external/kapdata",
+    "source_files": {
+      "2022-12-01_2023-05-26.jsonl": {
+        "bytes": 364618076,
+        "sha256": "116c94ae4e6ef66f450c69bfccccd39b235123843d7453b5203b59ff866f9243"
+      },
+      "2023-05-27_2023-11-19.jsonl": {
+        "bytes": 258214699,
+        "sha256": "048809e9a638b69d440023f710b7064980368995b0ef6376f10cc1dd9983c28f"
+      },
+      "2023-11-20_2024-05-15.jsonl": {
+        "bytes": 358085132,
+        "sha256": "ee3e0346b34923bec066838c2243057440e7b38eea1358bfe82fc7e1daf7f83a"
+      },
+      "2024-05-16_2024-11-08.jsonl": {
+        "bytes": 248047314,
+        "sha256": "e88538d56ca932b865b368658775b358a429d9c3ee5331c323075a81fc9a4e16"
+      },
+      "2024-11-09_2025-05-04.jsonl": {
+        "bytes": 375679705,
+        "sha256": "9ee3b3592b1d9536fe09618f5834793911150846d0b79ca2edf0553e0785167a"
+      },
+      "2025-05-05_2025-10-29.jsonl": {
+        "bytes": 212160410,
+        "sha256": "5414302c765b892c8d882331f0fb6a6ddadf5f2161a22178ae9ea35ab37a8100"
+      },
+      "2025-10-30_2026-04-24.jsonl": {
+        "bytes": 404149079,
+        "sha256": "d7f383840f82351af536f1c4d05549c740b8f22150366daa16e9dc33351e92d0"
+      },
+      "2026-04-25_2026-10-19.jsonl": {
+        "bytes": 248337683,
+        "sha256": "cec38b66b9656c2a743fc5dbe56a3380c15d47051b3590bf1f23e509184c3513"
+      }
+    },
+    "filter": "title == 'Finansal Rapor' and stock_code in universe and publish_date < 2026-11-20 00:00:00",
+    "records": 1683,
+    "first_publish": "2022-12-12 18:13:12",
+    "last_publish": "2026-10-02 19:56:09"
+  },
+  "files": {
+    "financial_reports.jsonl.gz": "2d18914c24875259e135ec8435a0eaa3a3fb9deebe86698425e1dac34e3b540f"
+  },
+  "content_sha256": "b204156708af2fcb987b7b5958434e5ce2186d9555ca12ca9ba305cb55727dbc"
+}

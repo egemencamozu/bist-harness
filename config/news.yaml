@@ -1,0 +1,131 @@
+# News metadata tagging (CLAUDE.md §11): Bloomberg HT archive -> news_events (contextual evidence only).
+#
+# Matching is deterministic and runs on Turkish-lowercased text (İ->i, I->ı).
+#   names: case-insensitive phrases (word-bounded)    exact: case-sensitive tokens (e.g. THY, BİM)
+#   exclude: phrases blanked out before this ticker's names are matched ("türkiye sigorta birliği" is not TURSG)
+#   code: false — the ticker code is an everyday word / other entity (DEVA = DEVA Partisi): never match the code
+# Universe: all 96 tickers of config/universe.yaml (course 30 tagged since 2026-11-21, the other 66 since 2026-11-23).
+# Ambiguous everyday words only in a longer form ("anadolu efes" not "efes" = Ephesus; "çelebi hava" not the
+# surname; TAV only upper-case). Precision audit: reports/news_tagging_audit.md.
+# A ticker is attached when an alias appears in the TITLE, or its code (e.g. THYAO) appears anywhere, or aliases
+# appear at least `min_body_mentions` times in the body. Round-up/recap pages only keep title matches.
+min_body_mentions: 2
+# Market recaps list many codes in the body: when more than max_body_tickers tickers match only in the body, only
+# title matches are kept (2026-11-21: daily "Piyasa özeti" pages matched 5-9 tickers each).
+max_body_tickers: 4
+roundup_title_patterns: ["gündemi", "gündem -", "piyasalarda gün", "günün özeti", "piyasa özeti", "canlı blog", "haftanın özeti"]
+
+tickers:
+  ASELS: {names: [aselsan]}
+  TUPRS: {names: [tüpraş, tupras]}
+  BIMAS: {names: [bim birleşik mağazalar], exact: [BİM]}
+  THYAO: {names: [türk hava yolları, turkish airlines], exact: [THY]}
+  AKBNK: {names: [akbank]}
+  KCHOL: {names: [koç holding]}
+  EREGL: {names: [ereğli demir, erdemir]}
+  TCELL: {names: [turkcell]}
+  CCOLA: {names: [coca-cola içecek, coca cola içecek], exact: [CCI]}
+  MGROS: {names: [migros]}
+  SASA: {names: [sasa polyester], exact: [SASA]}
+  TRALT: {names: [türk altın, koza altın]}
+  FROTO: {names: [ford otosan, ford otomotiv]}
+  ENKAI: {names: [enka inşaat], exact: [ENKA]}
+  PGSUS: {names: [pegasus hava, pegasus]}
+  MPARK: {names: [medical park, mlp sağlık], exact: [MLP Care]}
+  EKGYO: {names: [emlak konut]}
+  GUBRF: {names: [gübretaş, gübre fabrikaları]}
+  TURSG: {names: [türkiye sigorta], exclude: [türkiye sigorta birliği, türkiye sigorta piyasa*, türkiye sigorta sektör*]}
+  ENJSA: {names: [enerjisa], exclude: [enerjisa üretim]}   # Enerjisa Üretim is not listed
+  TTKOM: {names: [türk telekom]}
+  OYAKC: {names: [oyak çimento]}
+  AKSEN: {names: [aksa enerji]}
+  ISMEN: {names: [iş yatırım]}
+  ARCLK: {names: [arçelik, arcelik]}
+  ECILC: {names: [eczacıbaşı ilaç]}
+  MAVI: {names: [mavi giyim]}
+  PETKM: {names: [petkim]}
+  TOASO: {names: [tofaş, tofas]}
+  KRDMD: {names: [kardemir, karabük demir]}
+
+  # ---- the other 66 tickers of the 96 universe (2026-11-23)
+  AEFES: {names: [anadolu efes]}
+  AGHOL: {names: [ag anadolu grubu, anadolu grubu holding]}
+  AKCNS: {names: [akçansa]}
+  AKENR: {names: [akenerji]}
+  AKSA: {names: [aksa akrilik]}
+  ALARK: {names: [alarko], exclude: [alarko gyo, alarko carrier]}
+  ALBRK: {names: [albaraka], exclude: [albaraka zirve*, albaraka islam ekonomisi forum*]}   # event names
+  ALGYO: {names: [alarko gyo]}
+  ANHYT: {names: [anadolu hayat]}
+  ANSGR: {names: [anadolu sigorta]}
+  ARDYZ: {names: [ard bilişim, ard grup]}
+  AYEN: {names: [ayen enerji]}
+  AYGAZ: {names: [aygaz]}
+  BERA: {names: [bera holding]}
+  BRISA: {names: [brisa]}
+  BRSAN: {names: [borusan boru, borusan mannesmann]}
+  BRYAT: {names: [borusan yatırım]}
+  BTCIM: {names: [batıçim]}
+  CANTE: {names: [çan2 termik, çan2]}
+  CEMTS: {names: [çemtaş]}
+  CIMSA: {names: [çimsa]}
+  CLEBI: {names: [çelebi hava, çelebi havacılık]}
+  DEVA: {names: [deva holding], code: false}   # DEVA = DEVA Partisi in news
+  DOAS: {names: [doğuş otomotiv]}
+  DOHOL: {names: [doğan holding, doğan şirketler grubu]}
+  ECZYT: {names: [eczacıbaşı yatırım]}
+  EGEEN: {names: [ege endüstri]}
+  EGGUB: {names: [ege gübre]}
+  GARAN: {names: [garanti bbva, garanti bankası], exclude: [garanti bbva yatırım, garanti bbva portföy]}
+  GESAN: {names: [girişim elektrik]}
+  GLYHO: {names: [global yatırım holding]}
+  GOODY: {names: [goodyear]}
+  GWIND: {names: [galata wind]}
+  HALKB: {names: [halkbank, halk bankası]}
+  HEKTS: {names: [hektaş]}
+  ISCTR: {names: [iş bankası, işbank]}
+  ISDMR: {names: [isdemir, iskenderun demir çelik]}
+  ISGYO: {names: [iş gyo, iş gayrimenkul]}
+  JANTS: {names: [jantsa]}
+  KARSN: {names: [karsan]}
+  KATMR: {names: [katmerciler]}
+  KORDS: {names: [kordsa]}
+  LOGO: {names: [logo yazılım]}
+  MIATK: {names: [mia teknoloji]}
+  NUHCM: {names: [nuh çimento]}
+  ODAS: {names: [odaş]}
+  OTKAR: {names: [otokar]}
+  RYSAS: {names: [reysaş]}
+  SAHOL: {names: [sabancı], exclude: [sabancı üniversitesi, sabancı vakfı, suzan sabancı, bridgestone sabancı]}
+  SELEC: {names: [selçuk ecza]}
+  SISE: {names: [şişecam, şişe cam]}
+  SNGYO: {names: [sinpaş gyo]}
+  SOKM: {names: [şok market]}
+  TATGD: {names: [tat gıda]}
+  TAVHL: {names: [tav havalimanları], exact: [TAV]}
+  TKFEN: {names: [tekfen]}
+  TRGYO: {names: [torunlar gyo]}
+  TSKB: {names: [sınai kalkınma bankası]}
+  TTRAK: {names: [türk traktör]}
+  TUKAS: {names: [tukaş]}
+  ULKER: {names: [ülker], exclude: [ali ülker, murat ülker]}   # Yıldız Holding people, not the listed company
+  VAKBN: {names: [vakıfbank, vakıflar bankası]}
+  VESBE: {names: [vestel beyaz eşya]}
+  VESTL: {names: [vestel], exclude: [vestel beyaz eşya]}
+  YKBNK: {names: [yapı kredi], exclude: [yapı kredi plaza, yapı kredi yatırım, yapı kredi portföy]}   # research desk / funds
+  ZOREN: {names: [zorlu enerji]}
+
+# Topic -> phrases (Turkish lowercase, word-bounded prefixes allowed with a trailing *). Order = event_type priority.
+topics:
+  earnings: [bilanço*, "net kâr*", "net kar*", "net dönem kâr*", "finansal sonuç*", "çeyrek sonuç*", "kârını açıkla*", "karını açıkla*"]
+  dividend: [temettü*, "kâr payı", "kar payı"]
+  corporate_action: [bedelsiz, "sermaye artırım*", "pay bölünme*", "geri alım*"]
+  contract: [sözleşme*, ihale*, "anlaşma imzala*", sipariş*]
+  regulation: [spk, bddk, sedk, "rekabet kurulu", düzenleme*]
+  rates: ["politika faiz*", ppk, "faiz karar*", "merkez bankası", tcmb, "faiz indirim*", "faiz artırım*"]
+  inflation: [enflasyon*, tüfe, üfe]
+  fx: [dolar*, "dolar/tl", "euro/tl", euro*, avro*, döviz*, kurlar*, "kur farkı", "kur şok*"]
+  fed: [fed, fomc, powell]
+  commodity: [petrol*, brent, "altın fiyat*", "ons altın", doğalgaz*, emtia*, çelik*]
+  geopolitics: [savaş*, jeopolitik*, saldırı*, ateşkes*, yaptırım*]
+  equity_market: ["borsa istanbul", "bist 100", bist100, "bıst 100", bıst100, borsa*]

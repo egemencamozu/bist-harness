@@ -1,0 +1,7 @@
+# Separate GPU training environment (not the project uv venv). Versions are pinned at install time on the GPU machine.
+unsloth
+trl
+peft
+datasets
+bitsandbytes
+accelerate
