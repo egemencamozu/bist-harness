@@ -527,6 +527,16 @@ Verilen kararlar (2026-11-20):
   ayrı GPU ortamında `training/train_qlora.py --pilot-steps 20` ile gerçek süre ölçümü (4B yerelde / 9B bulutta
   kararı) → tam eğitim → GGUF → Ollama → `eval.bakeoff` ile önce/sonra karşılaştırması.
 
+- **Konuşma katmanı (2026-11-23, branch `feature/speech-layer`, kullanıcı onayı):** liste `data/manual/videos.csv`
+  (7 video, deneylerden önce sabit): Mete Üstündağ / FİNANS VE BORSA ×5 (2026-01-21 – 2026-03-07; bilanço, sektör,
+  para girişi, yabancı akışı, BofA alımı → doğrulanır / kısmen / doğrulanamaz örnekleri) + TCMB Karahan ER 2026-III
+  (13.08.2026) + FOMC Warsh (29.07.2026). Damodaran kullanıcı kararıyla çıkarıldı. Metin = YouTube'un kendi
+  "Transkripti göster" paneli elle kopyalanır (indirme / yt-dlp YOK, platform koruması aşılmaz); resmi metinler
+  altyazı kelime hata oranını ölçer (`speech.aligned_wer`), FB videoları TCMB'nin ölçülen kalitesini ödünç alır.
+  Transkript `.txt`'leri git'e girmez. Ingest `data/ingest/speech.py` (docstring tek doğruluk kaynağı). Sonraki adım:
+  iddia çıkarma (yerel LLM önerir, sayı metinde birebir geçmeli) + araçlarla doğrulama (yeni araç = imza değişikliği
+  → kullanıcı onayı).
+
 Açık:
 1. (kapandı) Makro anahtarsız çözüldü — §11.
-2. Video listesinin somut içeriği (konuşma katmanına gelince önerilecek).
+2. (kapandı) Video listesi — yukarıda.

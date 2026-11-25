@@ -40,3 +40,9 @@ reports/bakeoff/bundles.jsonl
 .venv-train/
 .tools/
 unsloth_compiled_cache/
+
+# Pasted video transcripts (third-party text; stays local like the raw news text)
+data/manual/transcripts/*.txt
+
+# Downloaded release assets (setup/get_assets.ps1)
+.assets/

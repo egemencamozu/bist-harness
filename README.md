@@ -8,12 +8,15 @@ kanıtlı, yatırım tavsiyesi yok. Ayrıntılı tasarım ve kurallar: [CLAUDE.m
 
 Gerekenler: Docker Desktop (WSL2) + NVIDIA GPU sürücüsü (≥ 6 GB VRAM önerilir; GPU yoksa CPU'da yavaş çalışır).
 
-Git'e girmeyen iki dosyayı yerleştirin (indirme bağlantıları ayrıca paylaşılır):
+Git'e girmeyen iki dosya deponun gizli GitHub Release'inde (`assets-2026-11-20`); betik indirir, sha256'yı
+doğrular ve yerine koyar (`gh auth login` gerekir):
 
 ```
-data/db/bist.sqlite            # fiyat, KAP bilançoları, makro, haber metadatası (~74 MB)
-models/bist-4b-q8_0.gguf       # ince ayarlı model (~4,5 GB)
+powershell -ExecutionPolicy Bypass -File setup\get_assets.ps1
+# -> data/db/bist.sqlite (fiyat, KAP, makro, haber metadatası, ~74 MB) + models/bist-4b-q8_0.gguf (~4,5 GB)
 ```
+
+Video katmanı üzerinde çalışacaklar için devir rehberi: [docs/VIDEO_KATMANI_REHBERI.md](docs/VIDEO_KATMANI_REHBERI.md).
 
 Sonra:
 
