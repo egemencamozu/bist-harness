@@ -104,55 +104,64 @@ LLM istemcisini (harness) import edemez.
 
 ---
 
-## 4. Kurulum (Windows)
+## 4. Kurulum (macOS veya Windows)
+
+Komutlar iki sistem için ayrı verildi. **macOS** ana yol, Windows komutları altında.
 
 ### 4.1 Gerekenler
-| Araç | Sürüm | Not |
-|---|---|---|
-| Git | herhangi | |
-| [uv](https://docs.astral.sh/uv/) | ≥ 0.10 | Python 3.12'yi kendisi kurar |
-| [Ollama](https://ollama.com/download) | **0.40.17** | Sonuçlar bu sürümle ölçüldü; farklı sürüm farklı çıktı üretebilir |
-| GitHub CLI (`gh`) | herhangi | `winget install GitHub.cli`, sonra `gh auth login` |
-| NVIDIA GPU | ≥ 6 GB VRAM önerilir | GPU yoksa model CPU'da çalışır ama çok yavaş |
+| Araç | macOS | Windows | Not |
+|---|---|---|---|
+| Git | `xcode-select --install` (ya da `brew install git`) | git-scm.com | |
+| [uv](https://docs.astral.sh/uv/) | `brew install uv` | `winget install astral-sh.uv` | Python 3.12'yi kendisi kurar |
+| [Ollama](https://ollama.com/download) | uygulamayı indir | kurulum dosyası | **0.40.17** önerilir (sonuçlar bu sürümle ölçüldü) |
+| GitHub CLI | `brew install gh` | `winget install GitHub.cli` | sonra `gh auth login` |
 
-Ollama için bir kez şu ortam değişkenini ayarla. Ollama yeniden başlarken yarım inmiş modelleri silmesin:
-```powershell
-setx OLLAMA_NOPRUNE 1
-```
+- **Donanım:** Apple Silicon (M1–M4) Mac'te Ollama GPU'yu (Metal) kendisi kullanır. Model 4,5 GB olduğu için en az
+  16 GB RAM rahat çalışır. Windows'ta ≥ 6 GB VRAM'li bir NVIDIA GPU önerilir.
+- **Mac'te çıktı farkı:** ölçümler Windows + NVIDIA'da yapıldı. Mac'te (Metal) model aynı soruya bayt düzeyinde
+  biraz farklı cevap üretebilir. Bu normaldir, denetçi ve testler bundan etkilenmez. `reports/` altındaki sayıları
+  yeniden üretmeye çalışma; tekrar üretim (replay) karşılaştırmalarını hep aynı makinede yap.
+- Ollama yeniden başlarken yarım inmiş modelleri silmesin diye: macOS'ta `launchctl setenv OLLAMA_NOPRUNE 1`,
+  Windows'ta `setx OLLAMA_NOPRUNE 1`.
 
 ### 4.2 Projeyi al
-Depo gizli. Egemen seni collaborator olarak eklemiş olmalı.
-```powershell
-git clone https://github.com/egemencamozu/bist-harness.git
+Depo gizli. Egemen seni collaborator olarak ekledi; GitHub'dan gelen daveti kabul et.
+```bash
+gh auth login                      # GitHub.com → HTTPS → Login with a web browser
+gh repo clone egemencamozu/bist-harness
 cd bist-harness
 git checkout feature/speech-layer
 uv sync --extra dev --extra llm --extra ui --extra mcp
 ```
 
 ### 4.3 Veritabanı ve model
-İkisi de git'te değil; depodaki gizli bir **GitHub Release**'te duruyor. Betik indirir, sha256'ları doğrular,
-yerlerine koyar ve modeli Ollama'ya kaydeder:
-```powershell
-gh auth login                                                   # bir kez
-powershell -ExecutionPolicy Bypass -File setup\get_assets.ps1   # DB (~15 MB) + model (~4,5 GB)
+İkisi de git'te değil; depodaki gizli **GitHub Release**'te (`assets-2026-11-20`) duruyor. Betik indirir,
+sha256'ları doğrular, yerlerine koyar ve modeli Ollama'ya kaydeder. Önce Ollama'nın açık olduğundan emin ol.
+```bash
+bash setup/get_assets.sh                    # macOS: DB (~15 MB) + model (~4,5 GB)
+bash setup/get_assets.sh --skip-model       # yalnız DB
 ```
-- Yalnız veritabanı lazımsa `-SkipModel` ekle.
+```powershell
+powershell -ExecutionPolicy Bypass -File setup\get_assets.ps1             # Windows
+powershell -ExecutionPolicy Bypass -File setup\get_assets.ps1 -SkipModel  # yalnız DB
+```
 - Beklenen çıktı: her dosya için `ok ...` satırları, sonunda `ollama list` içinde `bist-analist`.
 - Dosyalar şuraya gider: `data/db/bist.sqlite` ve `models/bist-4b-q8_0.gguf`.
-- İş bitince `.assets\` klasörünü silebilirsin.
+- İş bitince `.assets/` klasörünü silebilirsin.
 
 İddia çıkarmada taban modeli de denemek istersen: `ollama pull qwen3.5:4b`.
 
 ### 4.4 Çalıştığını doğrula
-```powershell
+```bash
 uv run pytest -q                 # hepsi geçmeli (DB varsa ~334 test)
-uv run ruff check . ; uv run mypy src
+uv run ruff check . && uv run mypy src
 uv run python -m bistharness.harness run --as-of 2026-09-10 --explainer llm --question "ASELS pazartesi düşerse cuma toparlıyor mu?"
 uv run streamlit run src/bistharness/ui/app.py   # http://localhost:8501
 ```
 Harness komutu 17 state'in durumunu, kanıtları, kapıyı ve modelin açıklamasını basar (~30–60 sn).
 
-Docker ile çalıştırmak istersen kök dizindeki `README.md`'ye bak. Ama geliştirme için yerel kurulum daha pratik.
+**Docker:** Mac'te Docker container'ları GPU'ya erişemez, yani model container içinde CPU'da ve çok yavaş çalışır.
+Mac'te yerel kurulumu (yukarıdaki adımlar) kullan.
 
 ---
 
@@ -369,8 +378,8 @@ her biri için unit test ve PIT zehir testi zorunlu.
 ## 9. Sık sorunlar
 | Sorun | Çözüm |
 |---|---|
-| `UnicodeEncodeError` / bozuk Türkçe | PowerShell'de `$env:PYTHONIOENCODING="utf-8"`; dosya IO'sunda `encoding="utf-8"` |
-| Model çok yavaş (dakikalar) | `num_ctx 4096` dışına çıkma; 8 GB VRAM'de 8192 modeli CPU'ya taşıyor |
+| `UnicodeEncodeError` / bozuk Türkçe (Windows) | PowerShell'de `$env:PYTHONIOENCODING="utf-8"`; dosya IO'sunda her zaman `encoding="utf-8"` (kod iki sistemde de çalışmalı) |
+| Model çok yavaş (dakikalar) | `num_ctx 4096` dışına çıkma (8 GB VRAM'de 8192 modeli CPU'ya taşıyor); Mac'te başka büyük uygulamaları kapat |
 | Aynı istem farklı çıktı | Ollama önek önbelleği; harness "soğuk çağrı" yapıyor (`fresh: true`), sen de öyle yap |
 | `prediction aborted, token repeat limit` | Model döngüye girmiş; `OllamaClient` bunu boş/geçersiz cevaba çevirir. Şemaya `maxItems`/`maxLength` ekle |
 | `SnapshotIntegrityError ... use a new --snapshot` | Transkript değişti; yeni snapshot tarihi kullan (§6.4) |
