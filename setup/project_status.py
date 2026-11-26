@@ -59,19 +59,22 @@ def render(root: Path, previous: dict[str, tuple[float, int]]) -> str:
     stages = read_stages(root)
     entries = json.loads((root / "CHECKPOINT.json").read_text(encoding="utf-8-sig"))["entries"]
     current = next((name for name, tasks in stages.items() if not all(done for done, _ in tasks)), None)
+    waiting = bool(current and current.startswith("4.") and entries.get("speech.phase4", {}).get("status") == "pending")
     all_tasks = [task for tasks in stages.values() for task in tasks]
     remaining = sum(not done for done, _ in all_tasks)
     local_time = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%d.%m.%Y %H:%M:%S")
     lines = [
         f"BIST Harness / Speech Layer     {local_time} (İstanbul)",
         "",
-        f"Şu an: {current or 'Tüm aşamalar tamamlandı'}",
+        f"{'Onay bekliyor' if waiting else 'Şu an'}: {current or 'Tüm aşamalar tamamlandı'}",
         f"Görevler: {len(all_tasks) - remaining}/{len(all_tasks)} tamamlandı, {remaining} kaldı",
         "",
     ]
     for name, tasks in stages.items():
         finished = sum(done for done, _ in tasks)
         status = "Tamamlandı" if finished == len(tasks) else "Şu an" if name == current else "Bekliyor"
+        if name == current and waiting:
+            status = "Onay bekliyor"
         lines.append(f"{name}  [{status} · {finished}/{len(tasks)}]")
         if name == current:
             lines.extend(f"  - {task}" for done, task in tasks if not done)
