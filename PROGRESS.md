@@ -4,13 +4,21 @@
 
 Uzak dal ve `1f1d00f6997b0b880219809f162b9c6a8cf4836b` başlangıç sürümü doğrulandı. Çalışma klasörü ilk kontrolde boştu. Rehberler ve konuşma katmanının uygulama noktaları incelendi. Release listesi doğrulandı.
 
-Git for Windows ve uv kuruldu. Uzak dal yerelde izleniyor. Atomik checkpoint yazımı, eşzamanlı yazma engeli, yarım geçici kaydın yok sayılması ve girdi kimliği değişimi doğrulandı. Release DB indirmesi 1.048.576 bayttan devam etti. Sıkıştırılmış dosya ve kurulu `data/db/bist.sqlite` SHA-256 ile doğrulandı.
+Git for Windows ve uv kuruldu. Uzak dal yerelde izleniyor. Atomik checkpoint yazımı, eşzamanlı yazma engeli, yarım geçici kaydın yok sayılması ve girdi kimliği değişimi doğrulandı. Release DB indirmesi 1.048.576 bayttan devam etti. Sıkıştırılmış dosya ve kurulu `data/db/bist.sqlite` SHA-256 ile doğrulandı. İlk yerel Git checkpoint'i `31ec204`.
+
+Python 3.12.16 ve kilitli 76 paket hazır. Release DB için SQLite `quick_check` sonucu `ok`. Son işlem günü 19 Kasım 2026 ve konuşma segmenti sayısı 0. pytest 334/334, Ruff lint ve format başarılı, mypy 75 kaynak dosyasında temiz, şablonla golden 5/5. Testler `.venv` içerisindeki araçlarla çalıştırıldı.
+
+Ollama 0.40.17 arşivi ile GGUF parça indirmesi başladı. Son ölçümde sırasıyla yaklaşık 206 MiB ve ilk GGUF parçasında 232 MiB kısmi çıktı vardı. Yerel model kaydı ve LLM'li Harness duman testi tamamlanmayı bekliyor. Kısmi bayt sayısını `.assets/` altındaki ilgili dosyadan kontrol et.
 
 ## Sonraki adım
 
-`CHECKPOINT.json` ve Git durumunu doğrula. GGUF ve Ollama indirmelerinin durumuna, ardından başlangıç testlerine bak. Faz doğrulamaları ile Egemen onaylarını kaydet.
+`CHECKPOINT.json` ve Git durumunu doğrula. GGUF ve Ollama indirmelerini tamamla, modelin yerel kaydını ve LLM'li Harness duman testini yap. Çalışma süresini ve sonucu kaydet. Başlangıç fazı doğrulandıktan sonra Egemen onayıyla transkript hazırlığına geç.
 
-`powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
+`powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. JSON doğrulaması başarısız olursa `git show HEAD:CHECKPOINT.json` ile son yerel Git kaydını oku ve dosya sağlama toplamlarını yeniden kontrol et. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1 -OllamaRuntime` sabit sürümün Windows paketini doğrulayıp `.tools/ollama-0.40.17` altına açar. WinGet bu sürümü listelemedi. Proje bağımlılıkları için `UV_CACHE_DIR=.tools/uv-cache` ve `UV_PYTHON_INSTALL_DIR=.tools/python` ortam değişkenlerini proje kökünü baz alarak ayarla. `uv sync --locked --python 3.12 --extra dev --extra llm --extra ui --extra mcp` komutuyla aynı ortamı sürdür.
+
+Model ve çalışma zamanı doğrulandıktan sonra yerel Ollama hizmetinin mevcut durumunu denetle. Gerekirse `OLLAMA_HOST=127.0.0.1:11434` ve proje altındaki `.tools/ollama-models` yoluyla `OLLAMA_MODELS` ayarlayarak `.tools/ollama-0.40.17/ollama.exe serve` başlat. Release GGUF'u `setup/get_assets.ps1` içindeki Modelfile ayarlarıyla kaydet. Mevcut aynı adlı modelin kaynağını kontrol et. `ollama show bist-analist --modelfile` ve harness duman testiyle doğrula.
 
 ## Uzun işleri sürdürme
 

@@ -7,9 +7,6 @@
                                       "status":  "completed",
                                       "detail":  "Repository, hardware, documentation and relevant implementation reviewed."
                                   },
-                    "baseline":  {
-                                     "status":  "pending"
-                                 },
                     "checkpoint":  {
                                        "status":  "completed",
                                        "updated_at":  "2026-11-26T13:00:13.3649742+00:00",
@@ -45,6 +42,18 @@
                                                              "updated_at":  "2026-11-26T13:02:05.6819402+00:00",
                                                              "fingerprint":  "69db0bc816a532a96b9edf8661d6a49f3e0e0403288dc784ba6976e5369202f4",
                                                              "detail":  "assets-2026-11-20"
-                                                         }
+                                                         },
+                    "baseline.static":  {
+                                            "status":  "completed",
+                                            "updated_at":  "2026-11-26T13:11:45.3683620+00:00",
+                                            "fingerprint":  "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
+                                            "detail":  "Python 3.12.16, 334 tests, Ruff lint and format, mypy (75 files), template golden 5/5 and SQLite quick_check OK."
+                                        },
+                    "baseline":  {
+                                     "status":  "in_progress",
+                                     "updated_at":  "2026-11-26T13:11:45.4257060+00:00",
+                                     "fingerprint":  "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
+                                     "detail":  "Static baseline passed; waiting for Release model and Ollama runtime before local inference smoke test."
+                                 }
                 }
 }

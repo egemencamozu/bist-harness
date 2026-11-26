@@ -1,21 +1,27 @@
-[CmdletBinding()]
-param([switch]$SkipModel)
+[CmdletBinding(DefaultParameterSetName = 'ProjectAssets')]
+param(
+    [Parameter(ParameterSetName = 'ProjectAssets')]
+    [switch]$SkipModel,
+    [Parameter(Mandatory, ParameterSetName = 'OllamaRuntime')]
+    [switch]$OllamaRuntime
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'checkpoint.ps1')
-$tag = 'assets-2026-11-20'
-$repo = 'egemencamozu/bist-harness'
+$tag = if ($OllamaRuntime) { 'v0.40.17' } else { 'assets-2026-11-20' }
+$repo = if ($OllamaRuntime) { 'ollama/ollama' } else { 'egemencamozu/bist-harness' }
 $base = "https://github.com/$repo/releases/download/$tag"
 $store = Join-Path $root '.assets'
-$lock = Open-CheckpointLock $root 'release.lock'
+$lockName = if ($OllamaRuntime) { 'ollama-runtime.lock' } else { 'release.lock' }
+$lock = Open-CheckpointLock $root $lockName
 
 function Test-AssetHash([string]$Path, [string]$Expected) {
     (Test-Path -LiteralPath $Path -PathType Leaf) -and
         ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq $Expected)
 }
 
-function Receive-ReleaseAsset($Asset) {
+function Receive-ReleaseAsset($Asset, [string]$PartialPath) {
     $name = $Asset.name
     if ($Asset.digest -notmatch '^sha256:([0-9a-f]{64})$' -or
         $Asset.browser_download_url -cne "$base/$name" -or $Asset.size -le 0) {
@@ -24,7 +30,7 @@ function Receive-ReleaseAsset($Asset) {
     $hash = $Matches[1]
     $directory = Join-Path $store $hash
     $ready = Join-Path $directory $name
-    $partial = "$ready.partial"
+    $partial = if ($PartialPath) { $PartialPath } else { "$ready.partial" }
     $operation = "download.$($name.ToLowerInvariant())"
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
 
@@ -96,12 +102,51 @@ function Get-ReleaseAsset([string]$Name) {
     $assets[$Name]
 }
 
+function Install-OllamaRuntime {
+    $archive = Get-ReleaseAsset 'ollama-windows-amd64.zip'
+    $hash = '3dd80f6e3a9699f2eadf4ac418f00529cee594df9557541806eda1f1f3f5588a'
+    if ($archive.digest -ne "sha256:$hash") { throw 'Unexpected Ollama archive checksum' }
+    $destination = Join-Path $root '.tools/ollama-0.40.17'
+    $exe = Join-Path $destination 'ollama.exe'
+    Write-CheckpointEntry $root 'ollama.runtime' in_progress $hash 'Preparing the pinned Ollama runtime.'
+    try {
+        if (!(Test-Path -LiteralPath $destination)) {
+            $download = Receive-ReleaseAsset $archive (Join-Path $store 'ollama-0.40.17-windows-amd64.zip.partial')
+            $extract = "$destination.partial"
+            New-Item -ItemType Directory -Path $extract -Force | Out-Null
+            tar.exe -xf $download -C $extract
+            if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath (Join-Path $extract 'ollama.exe'))) {
+                throw 'Ollama archive extraction failed'
+            }
+            [IO.Directory]::Move($extract, $destination)
+        }
+        $version = & {
+            $ErrorActionPreference = 'Continue'
+            $output = & $exe --version 2>&1
+            [PSCustomObject]@{ ExitCode = $LASTEXITCODE; Text = ($output -join ' ') }
+        }
+        if ($version.ExitCode -ne 0 -or $version.Text -notmatch '\b0\.40\.17\b') {
+            throw 'Unexpected Ollama executable version'
+        }
+        Write-CheckpointEntry $root 'ollama.runtime' completed $hash 'Official archive and local client version verified.'
+        Write-Host "Verified $exe"
+    } catch {
+        Write-CheckpointEntry $root 'ollama.runtime' failed $hash 'Runtime preparation failed; see console.'
+        throw
+    }
+}
+
 try {
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -TimeoutSec 25
     $assets = @{}
     foreach ($asset in $release.assets) {
         if ($assets.ContainsKey($asset.name)) { throw "Duplicate Release asset: $($asset.name)" }
         $assets[$asset.name] = $asset
+    }
+
+    if ($OllamaRuntime) {
+        Install-OllamaRuntime
+        return
     }
 
     $sumFile = Receive-ReleaseAsset (Get-ReleaseAsset 'SHA256SUMS.txt')
