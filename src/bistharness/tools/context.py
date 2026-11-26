@@ -18,6 +18,7 @@ from bistharness.core import formatting as fmt
 from bistharness.core.enums import Severity, ToolStatus, WarningCode
 from bistharness.tools import common
 from bistharness.tools.base import ToolContext, ToolInput, ToolInputError, ToolOutput, tool, warn
+from bistharness.tools.speech_verification import verify_claim
 
 MACRO_CODES = ("USDTRY", "EURTRY", "TCMB_POLICY_RATE", "FED_TARGET_UPPER", "FED_TARGET_LOWER", "TUFE_YOY", "TUFE_MOM")
 # must equal the topic keys of config/news.yaml (tests/test_tools.py checks it)
@@ -351,11 +352,11 @@ class SpeechInput(ToolInput):
 
 @tool(
     "get_speech_features",
-    version="1.0.0",
+    version="1.1.0",
     input_model=SpeechInput,
-    sources=("speech",),
+    sources=("speech", "fundamentals", "macro", "prices"),
     description="Timestamped transcript segments of selected public finance videos (URL, channel, segment range, "
-    "topics, stance, quality) published up to as_of_date. Expert opinion is context, not ground truth.",
+    "topics, stance, quality) up to as_of_date, with human-approved claims and deterministic checks.",
 )
 def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
     key = inp.source_id_or_topic.strip()
@@ -365,7 +366,7 @@ def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
     df = by_source if not by_source.empty else ctx.repo.speech_segments(as_of=inp.as_of_date, topic=key).data
     if df.empty:
         w = warn(WarningCode.SPEECH_NOT_AVAILABLE, f"no transcribed segment for {key!r} published by {inp.as_of_date}")
-        return ToolOutput({"query": key, "segments": []}, [w], status=ToolStatus.INSUFFICIENT_DATA)
+        return ToolOutput({"query": key, "segments": [], "claims": []}, [w], status=ToolStatus.INSUFFICIENT_DATA)
     warnings = []
     low = df[df["quality"].fillna(0) < 0.6]
     if len(low):
@@ -392,4 +393,12 @@ def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
         )
         for r in segs.itertuples()
     ]
-    return ToolOutput({"query": key, "segments": segs.drop(columns=["text"])}, warnings, evidence=ev)
+    approved = ctx.repo.speech_claims(as_of=inp.as_of_date, source_id=key if not by_source.empty else None).data
+    segment_keys = set(zip(df["source_id"], df["segment_start"], strict=True))
+    claims = [
+        {**claim, "verification": verify_claim(ctx, claim, inp.as_of_date)}
+        for claim in approved.astype(object).where(approved.notna(), None).to_dict("records")
+        if (claim["source_id"], claim["segment_start"]) in segment_keys
+        and (not by_source.empty or key not in ctx.universe.instruments or claim["subject"] == key)
+    ]
+    return ToolOutput({"query": key, "segments": segs.drop(columns=["text"]), "claims": claims}, warnings, evidence=ev)

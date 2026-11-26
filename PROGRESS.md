@@ -22,6 +22,8 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
+Dördüncü aşama tamamlandı. 343 test, Ruff ve mypy geçti. Beşinci aşama, Harness planlayıcı ve kanıt entegrasyonu için geçiş onayı bekliyor.
+
 PITRepository'nin KAP ve makro okumalarına isteğe bağlı İstanbul saati sınırı eklendi. Sınır SQL'de revizyon seçilmeden önce uygulanır ve as_of gün sonunu aşamaz. 46 PIT, doğrulama ve mevcut araç testi, Ruff ve mypy geçti. Bu destek mevcut araç sözleşmelerine eklenmedi.
 
 Onaylı 12 aday için veri hazırlığı:
@@ -41,7 +43,9 @@ Onaylı 12 aday için veri hazırlığı:
 
 Egemen dördüncü aşamaya başlamayı onayladı. 12 onaylı aday incelendi. ENKAI yıllık hasılat örneği, video yayımlanmadan önce açıklanan 1566104 numaralı KAP raporunun aynı konsolide tablosundaki 12 aylık cari ve önceki değerlerle tekrar hesaplandı. Gözlem %55,6643, söylenen %55. Tam yüzde için ±0,5 yüzde puanı uygulanırsa gözlem aralığın dışında kalır. Bu bir yöntem denemesidir. Diğer adaylarda özel skor tanımı, açık tahmin ufku, belirli metrik veya bağlam eksikliği görüldü.
 
-Devam noktası, doğrulama metodolojisi ve araç sözleşmesi için Egemen'in açık onayını almak. Öneri, sayısal iddialarda söyleniş hassasiyetini esas almak, KAP ve makro bilgisini yayın anında kesmek, karşılaştırılabilir dönem veya açık tahmin ufku bulunmadığında gerekçeyi raporlamak ve mevcut `get_speech_features` çıktısını genişletmek. Yayın saatinin ileri işlem penceresine nasıl bağlanacağı ayrıca kesinleştirilecek.
+Egemen söyleniş hassasiyeti, yayın saati sınırı, eksik girdilerin gerekçelendirilmesi ve `get_speech_features` çıktı genişletmesini sohbetten onayladı. Araç sürümü 1.1.0 ve yeni `claims` alanı onaylı iddiaları, sonucu ve varsa gözlem kaynağını döndürür. Alıntıdaki sayılar açıklamanın kanıt adaylarına eklenmez.
+
+Uygulanan kapsam, karşılaştırılabilir 12 aylık konsolide hasılat tablosu, açık seri ve güncel değer içeren TCMB faizi/TÜFE iddiaları ve işlem günü ufku açık tek hisse yön tahminidir. Tahmin başlangıcı yayın anında bilinen son işlem kapanışıdır. Karşılaştırması tanımlanamayan geçmiş fiyat, sektör, hacim ve kurum akışı iddiaları için gerekçe döner. Gerçek 12 iddiada 1 `CONTRADICTED` ve 11 `NOT_VERIFIABLE` sonucu elde edildi. ENKAI gözlemi %55,6643 olup söylenen %55 için [54,5, 55,5] aralığı dışındadır.
 
 Kodla seçilen 30 adaylık örneklem (tohum 42) Codex tarafından alıntı, çevre metni, konu ve iddia alanları üzerinden denetlendi. 2 doğru, 19 kısmen doğru, 9 yanlış. Katı kesinlik %6,7 (Wilson %95 GA %1,8–21,3), geniş kesinlik %70,0 (GA %52,1–83,3). Kısmi eşleşmelerde yön, metrik ve bağlam eksikleri görüldü. Yanlışlar arasında muhabir sorularının iddia sayılması ve şirket ifadesinin sektöre genellenmesi var. Denetim etiketleri `.assets/iddia-kesinlik-denetimi.json` içinde ve Egemen'in onaylarından ayrı tutuluyor.
 
@@ -57,7 +61,7 @@ Egemen 06, 08, 09, 23, 24, 26, 30, 31, 33, 34, 41 ve 53 numaralı 12 adayı onay
 
 Çıkarımı sürdürmek için etkin bir kopya olmadığını doğrula ve `.venv\Scripts\python.exe -m bistharness.harness.claims --as-of 2026-11-26` çalıştır. Arka plan günlüğü `.assets/speech-extraction.stderr.log` dosyasında. Kaynak alıntıları ve kararlar `data/manual/claims/<source_id>.jsonl` içinde yerelde kalır.
 
-Tam koşu tamamlandıktan sonra insan incelemesinde yalnız `reviewed` (onay için `true`, ret için `false`, bekleyen için `null`), `review_note` ve örneklemde `audit` alanlarını düzenle. Örneklemi `.venv\Scripts\python.exe -m eval.speech_review_audit --list` ile listele. Örnek kayıtları `correct`, `partial` veya `incorrect` olarak değerlendir ve kesinlik ile Wilson aralığını aynı komutla ölç. Ardından onaylı dosyaları yeni bir snapshot adıyla `speech --include-reviews` yolundan ingest et ve PIT çıktısını doğrula. Finansal iddia doğrulaması dördüncü aşamanın ayrı onayını bekler.
+Tam koşu tamamlandıktan sonra insan incelemesinde yalnız `reviewed` (onay için `true`, ret için `false`, bekleyen için `null`), `review_note` ve örneklemde `audit` alanlarını düzenle. Örneklemi `.venv\Scripts\python.exe -m eval.speech_review_audit --list` ile listele. Örnek kayıtları `correct`, `partial` veya `incorrect` olarak değerlendir ve kesinlik ile Wilson aralığını aynı komutla ölç. Ardından onaylı dosyaları yeni bir snapshot adıyla `speech --include-reviews` yolundan ingest et ve PIT çıktısını doğrula.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. JSON doğrulaması başarısız olursa `git show HEAD:CHECKPOINT.json` ile son yerel Git kaydını oku ve dosya sağlama toplamlarını yeniden kontrol et. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
 

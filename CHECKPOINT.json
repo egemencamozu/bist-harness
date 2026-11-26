@@ -127,11 +127,6 @@
       "fingerprint": "64cb4309d242fd85fd855a7519a876dd973c57cbc6a56c19bf4e9dc2d49702aa",
       "detail": "Codex audited 30 sampled proposals: 2 correct, 19 partial, 9 incorrect. Egemen approvals separate. Phase 4 paused by user."
     },
-    "speech.phase4": {
-      "status": "in_progress",
-      "updated_at": "2026-11-26T21:18:38.5932282+03:00",
-      "detail": "Egemen approved starting phase 4. Screened 12 claims and tested ENKAI against pre-publication KAP data. Awaiting methodology and tool contract decisions."
-    },
     "speech.phase4.pit": {
       "status": "completed",
       "updated_at": "2026-11-26T21:20:46.9841828+03:00",
@@ -140,9 +135,15 @@
     },
     "speech.phase4.preflight": {
       "status": "completed",
-      "updated_at": "2026-11-26T18:22:52.3111671+00:00",
+      "updated_at": "2026-11-26T21:22:52.3111671+03:00",
       "fingerprint": "c42a486f7a6424ef55497474f1f2810988fe55d0c7b251983e9d8dee2f3695c0",
       "detail": "Mapped all 12 approved claims to evidence availability; reproduced ENKAI with intraday PIT; 340 tests passed."
+    },
+    "speech.phase4": {
+      "status": "completed",
+      "updated_at": "2026-11-26T18:30:14.6696399+00:00",
+      "fingerprint": "ccb15d0963afd7805cfbf83ce4e4c717ba83ea56b04d7f7ca5200aebb9e543c1",
+      "detail": "Egemen approved methodology and result contract. get_speech_features 1.1.0 checked 12 claims: 1 contradicted, 11 not verifiable. 343 tests passed."
     }
   }
 }

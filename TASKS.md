@@ -33,9 +33,9 @@
 - [x] KAP ve makro sorgularına isteğe bağlı saat sınırı ekle. Aynı gün yayımlanan sonraki revizyonların görünmediğini test et.
 - [x] Onaylı 12 iddia için kullanılabilir kanıtı ve doğrulamaya engel olan eksik girdileri sınıflandır.
 
-- [ ] Egemen'in onayladığı doğrulama metodolojisi ve araç sözleşmesiyle deterministik doğrulama ve PIT testleri.
+- [x] Egemen'in onayladığı yöntemle deterministik doğrulama ve `get_speech_features` 1.1.0 çıktısını tamamla. 12 gerçek iddia doğrulama hattından geçti, 343 test başarılı.
 
-## 5. MCP ve Harness entegrasyonu
+## 5. MCP ve Harness entegrasyonu (aşama onayı bekliyor)
 
 - [ ] MCP, Harness ve kanıt entegrasyonu. En az bir uçtan uca çalışma.
 

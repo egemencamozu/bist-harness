@@ -1,10 +1,22 @@
+import sqlite3
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
-from bistharness.analytics.claims import ForecastWindow, Verdict, compare_observation, forecast_window
+from bistharness.analytics.claims import (
+    ForecastWindow,
+    Verdict,
+    compare_observation,
+    forecast_window,
+    quoted_percent_bounds,
+)
 from bistharness.core.calendar import TradingCalendar
+from bistharness.core.config import load_settings, load_universe
+from bistharness.core.pit import PITRepository
+from bistharness.tools import ToolContext, run_tool
+from bistharness.tools.speech_verification import verify_claim
+from tests.conftest import insert_prices
 
 
 def test_inclusive_bounds_and_missing_observations() -> None:
@@ -26,3 +38,78 @@ def test_future_trading_session_does_not_complete_the_window() -> None:
     assert forecast_window(calendar, date(2026, 3, 7), monday, 1) == ForecastWindow(None, Verdict.NOT_VERIFIABLE)
     with pytest.raises(ValueError):
         forecast_window(calendar, friday, monday, 0)
+
+
+def test_percentage_bounds_use_the_quoted_precision() -> None:
+    assert quoted_percent_bounds("Hasılat %55,") == (Decimal("54.5"), Decimal("55.5"))
+    assert quoted_percent_bounds("Faiz yüzde 4,50") == (Decimal("4.495"), Decimal("4.505"))
+    assert quoted_percent_bounds("−%5,5") == (Decimal("-5.55"), Decimal("-5.45"))
+    assert quoted_percent_bounds("from 3.5 percent to 4 percent") is None
+
+
+def test_speech_tool_keeps_quotes_out_of_evidence_and_ignores_later_releases(mem_conn: sqlite3.Connection) -> None:
+    pub = "2026-10-05 09:00:00"
+    quote = "Şu anda yıllık TÜFE yüzde 40."
+    mem_conn.execute(
+        "INSERT INTO speech_segments VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("sample", 0, 60, pub, "", "A", "B", quote, '["inflation"]', None, 1.0, "fixture"),
+    )
+    mem_conn.execute(
+        "INSERT INTO speech_claims VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "one",
+            "sample",
+            0,
+            pub,
+            "seg",
+            "extract",
+            "MACRO",
+            "macro_value",
+            quote,
+            '[["pct",40.0]]',
+            "cpi_yoy",
+            "none",
+            None,
+            "neutral",
+            "high",
+            "",
+            "fixture",
+        ),
+    )
+    mem_conn.execute(
+        "INSERT INTO macro_observations VALUES (?,?,?,?,?,?,?)",
+        ("TUFE_YOY", "2026-08-01", 40.0, "2026-09-03 10:00:00", "fixture", None, "fixture"),
+    )
+    ctx = ToolContext(PITRepository(mem_conn), load_settings(), load_universe())
+    inp = {"source_id_or_topic": "sample", "as_of_date": "2026-10-06"}
+    before = run_tool("get_speech_features", inp, ctx)
+    assert before.result["claims"][0]["verification"]["status"] == Verdict.SUPPORTED
+    assert all("40" not in value for item in before.evidence_candidates for value in item.display.values())
+    mem_conn.execute(
+        "INSERT INTO macro_observations VALUES (?,?,?,?,?,?,?)",
+        ("TUFE_YOY", "2026-08-01", 999.0, "2026-10-05 09:00:01", "fixture", None, "fixture"),
+    )
+    after = run_tool("get_speech_features", inp, ctx)
+    assert before.output_hash == after.output_hash
+    early = run_tool("get_speech_features", {**inp, "as_of_date": "2026-10-04"}, ctx)
+    assert early.result["claims"] == []
+
+
+def test_price_forecast_uses_known_close_and_requires_explicit_sessions(mem_conn: sqlite3.Connection) -> None:
+    friday, monday, tuesday = (date(2026, 3, n) for n in (6, 9, 10))
+    insert_prices(mem_conn, "THYAO", [friday, monday, tuesday], [100.0, 105.0, 110.0])
+    ctx = ToolContext(PITRepository(mem_conn), load_settings(), load_universe())
+    claim = {
+        "subject": "THYAO",
+        "published_at": "2026-03-06 19:00:00",
+        "claim_type": "price_move_forecast",
+        "metric": None,
+        "direction": "up",
+        "horizon_days": 2,
+        "quote": "2 işlem günü içinde yükselecek.",
+    }
+    assert verify_claim(ctx, claim, monday)["status"] == Verdict.FORWARD_WINDOW_INCOMPLETE
+    assert verify_claim(ctx, claim, tuesday)["status"] == Verdict.SUPPORTED
+    assert (
+        verify_claim(ctx, {**claim, "quote": "2 gün içinde yükselecek."}, tuesday)["status"] == Verdict.NOT_VERIFIABLE
+    )

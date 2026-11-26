@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -16,6 +17,23 @@ class Verdict(StrEnum):
     PARTIAL = "PARTIAL"
     NOT_VERIFIABLE = "NOT_VERIFIABLE"
     FORWARD_WINDOW_INCOMPLETE = "FORWARD_WINDOW_INCOMPLETE"
+
+
+_PERCENT = re.compile(
+    r"(?i)(?:%|\byüzde\s+)\s*([+-]?\d+(?:[.,]\d{1,2})?)(?![\d]|[.,]\d)"
+    r"|(?<![\d.,%])([+-]?\d+(?:[.,]\d{1,2})?)\s*(?:%|\bpercent\b)"
+)
+
+
+def quoted_percent_bounds(quote: str) -> tuple[Decimal, Decimal] | None:
+    """Use half the last quoted place for one explicit percentage."""
+    quote = re.sub(r"([+-])\s*%\s*(?=\d)", r"%\1", quote.replace("−", "-"))
+    numbers = [a or b for a, b in _PERCENT.findall(quote)]
+    if len(numbers) != 1:
+        return None
+    value = Decimal(numbers[0].replace(",", "."))
+    tolerance = Decimal("0.5").scaleb(-len(numbers[0].replace(",", ".").partition(".")[2]))
+    return value - tolerance, value + tolerance
 
 
 def compare_observation(observed: Decimal | None, lower: Decimal, upper: Decimal) -> Verdict:
