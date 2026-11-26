@@ -134,9 +134,15 @@
     },
     "speech.phase4.pit": {
       "status": "completed",
-      "updated_at": "2026-11-26T18:20:46.9841828+00:00",
+      "updated_at": "2026-11-26T21:20:46.9841828+03:00",
       "fingerprint": "aee2722e09bb900d13b17ebd6551c28345ee6b4f04a9bb0231c1a99ca49a7ed2",
       "detail": "Intraday knowledge cutoff filters KAP and macro revisions before selecting latest rows. 46 targeted tests passed."
+    },
+    "speech.phase4.preflight": {
+      "status": "completed",
+      "updated_at": "2026-11-26T18:22:52.3111671+00:00",
+      "fingerprint": "c42a486f7a6424ef55497474f1f2810988fe55d0c7b251983e9d8dee2f3695c0",
+      "detail": "Mapped all 12 approved claims to evidence availability; reproduced ENKAI with intraday PIT; 340 tests passed."
     }
   }
 }

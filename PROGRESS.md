@@ -24,6 +24,19 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 PITRepository'nin KAP ve makro okumalarına isteğe bağlı İstanbul saati sınırı eklendi. Sınır SQL'de revizyon seçilmeden önce uygulanır ve as_of gün sonunu aşamaz. 46 PIT, doğrulama ve mevcut araç testi, Ruff ve mypy geçti. Bu destek mevcut araç sözleşmelerine eklenmedi.
 
+Onaylı 12 aday için veri hazırlığı:
+
+| Aday | Sayı | Doğrulama girdisi |
+|---|---:|---|
+| ENKAI yıllık hasılat | 1 | Yayından önce açıklanan 1566104 numaralı raporda aynı konsolide tablonun cari ve karşılaştırmalı 12 aylık değerleri var. |
+| Fiyat, Pro veya F skoru | 5 | Skor kaynağı ve formülü bu iddialarda belirtilmiyor. CCOLA ve bir DOHOL kaydında model metriği alıntıdaki skor adıyla da uyuşmuyor. |
+| CCOLA değerleme çarpanları | 1 | Tek alıntıda birden fazla oran var. Her oran ayrı metrik ve tarih bağlamıyla eşlenmeli. |
+| Makro aktarım ifadeleri | 2 | Faiz ve enflasyon ilişkisine dair genel ifadeler. Sınanacak seri, dönem veya ölçü belirtilmiyor. |
+| Bankacılık düzeltme tahmini | 1 | Tahminin işlem günü ufku belirtilmiyor. |
+| THYAO nakit değerlendirmesi ve banka hisseleri görüşü | 2 | Nitel görüş. Açık bir ölçüt veya sayısal eşik belirtilmiyor. |
+
+İlk doğrulama denemesi için ENKAI girdisi hazır. Yayın saati sınırı uygulanarak mevcut `fundamentals.growth` hesabıyla %55,6643 tekrar üretildi. Diğer satırlardaki eksikler korunacak ve gerekçe olarak sunulacak. Bu ön inceleme, sayısal doğrulama kararı üretmedi. Tam test koşusunda 340 test geçti.
+
 Üçüncü aşama tamamlandı. 181 segmentten 276 aday çıktı. Egemen'in 12 onayı `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı doğrulandı. Dördüncü aşamada `analytics/claims.py` içinde birimi eşleştirilmiş gözlem için kapsayıcı aralık kontrolü ve seçili işlem günü başlangıcı için as_of tarihine kilitli ileri pencere eklendi. 28 odaklı test, Ruff ve mypy geçti.
 
 Egemen dördüncü aşamaya başlamayı onayladı. 12 onaylı aday incelendi. ENKAI yıllık hasılat örneği, video yayımlanmadan önce açıklanan 1566104 numaralı KAP raporunun aynı konsolide tablosundaki 12 aylık cari ve önceki değerlerle tekrar hesaplandı. Gözlem %55,6643, söylenen %55. Tam yüzde için ±0,5 yüzde puanı uygulanırsa gözlem aralığın dışında kalır. Bu bir yöntem denemesidir. Diğer adaylarda özel skor tanımı, açık tahmin ufku, belirli metrik veya bağlam eksikliği görüldü.

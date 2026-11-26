@@ -31,6 +31,7 @@
 - [x] Sayısal sınır karşılaştırmasını ve ileri işlem penceresinin tarih kilidini saf hesaplama olarak test et.
 - [x] 12 onaylı iddianın veri uygunluğunu incele ve ENKAI örneğinde yayın öncesi KAP karşılaştırmasını sınama amaçlı hesapla.
 - [x] KAP ve makro sorgularına isteğe bağlı saat sınırı ekle. Aynı gün yayımlanan sonraki revizyonların görünmediğini test et.
+- [x] Onaylı 12 iddia için kullanılabilir kanıtı ve doğrulamaya engel olan eksik girdileri sınıflandır.
 
 - [ ] Egemen'in onayladığı doğrulama metodolojisi ve araç sözleşmesiyle deterministik doğrulama ve PIT testleri.
 
