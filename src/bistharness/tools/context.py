@@ -16,7 +16,7 @@ from pydantic import Field
 from bistharness.analytics import macro_stats
 from bistharness.analytics.claims import Verdict
 from bistharness.core import formatting as fmt
-from bistharness.core.enums import Severity, ToolStatus, WarningCode
+from bistharness.core.enums import Severity, WarningCode
 from bistharness.tools import common
 from bistharness.tools.base import ToolContext, ToolInput, ToolInputError, ToolOutput, tool, warn
 from bistharness.tools.speech_verification import verify_claim
@@ -353,7 +353,7 @@ class SpeechInput(ToolInput):
 
 @tool(
     "get_speech_features",
-    version="1.2.0",
+    version="1.2.1",
     input_model=SpeechInput,
     sources=("speech", "fundamentals", "macro", "prices"),
     description="Timestamped transcript segments of selected public finance videos (URL, channel, segment range, "
@@ -372,8 +372,10 @@ def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
         ).data
     )
     if df.empty:
+        # Speech is optional context (CLAUDE.md §4: missing news/speech = soft warning). Most tickers have no video,
+        # so INSUFFICIENT_DATA here would push every analysis gate to INVESTIGATE.
         w = warn(WarningCode.SPEECH_NOT_AVAILABLE, f"no transcribed segment for {key!r} published by {inp.as_of_date}")
-        return ToolOutput({"query": key, "segments": [], "claims": []}, [w], status=ToolStatus.INSUFFICIENT_DATA)
+        return ToolOutput({"query": key, "segments": [], "claims": []}, [w])
     warnings = []
     low = df[df["quality"].fillna(0) < 0.6]
     if len(low):

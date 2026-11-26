@@ -9,8 +9,13 @@ from typing import Any
 
 import pandas as pd
 
-from bistharness.analytics.claims import Verdict, compare_observation, forecast_window, quoted_percent_bounds
-from bistharness.analytics.fundamentals import growth
+from bistharness.analytics.claims import (
+    Verdict,
+    compare_observation,
+    forecast_window,
+    percent_change,
+    quoted_percent_bounds,
+)
 from bistharness.tools import common
 from bistharness.tools.base import ToolContext
 
@@ -60,10 +65,10 @@ def _annual_revenue(
     prior = pair[(pair["role"] == "prior") & (pair["fiscal_period"] == prior_period)]
     if len(prior) != 1 or len(pair) != 2 or prior.iloc[0]["unit"] != latest.unit:
         return None
-    current_value, prior_value = Decimal(str(latest.value)), Decimal(str(prior.iloc[0]["value"]))
-    if not current_value.is_finite() or not prior_value.is_finite() or prior_value <= 0:
+    change = percent_change(Decimal(str(latest.value)), Decimal(str(prior.iloc[0]["value"])))
+    if change is None:
         return None
-    return 100 * (current_value / prior_value - 1), {
+    return change, {
         "source": "KAP",
         "disclosure_index": int(latest.disclosure_index),
         "disclosed_at": latest.disclosure_datetime,
@@ -153,12 +158,17 @@ def _price_forecast(
         return {"status": window.failure, "reason": "MISSING_FORWARD_SESSIONS"}
     prices = ctx.repo.prices(ticker, start=anchor, end=window.end, as_of=window.end).data
     closes = prices.set_index("date")["close"]
-    change, _ = growth(closes.get(pd.Timestamp(window.end)), closes.get(pd.Timestamp(anchor)))
-    if change is None or not Decimal(str(change)).is_finite():
+    end_close, base_close = closes.get(pd.Timestamp(window.end)), closes.get(pd.Timestamp(anchor))
+    change = (
+        None
+        if end_close is None or base_close is None
+        else percent_change(Decimal(str(end_close)), Decimal(str(base_close)))
+    )
+    if change is None:
         return _unavailable("MISSING_PRICE_CLOSE")
     matches = change > 0 if direction == "up" else change < 0
     return {
         "status": Verdict.SUPPORTED if matches else Verdict.CONTRADICTED,
-        "observed_percent": 100 * change,
+        "observed_percent": float(change),
         "provenance": {"source": "prices", "base_session": anchor, "end_session": window.end},
     }

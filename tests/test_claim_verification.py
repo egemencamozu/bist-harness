@@ -9,6 +9,7 @@ from bistharness.analytics.claims import (
     Verdict,
     compare_observation,
     forecast_window,
+    percent_change,
     quoted_percent_bounds,
 )
 from bistharness.core.calendar import TradingCalendar
@@ -17,6 +18,13 @@ from bistharness.core.pit import PITRepository
 from bistharness.tools import ToolContext, run_tool
 from bistharness.tools.speech_verification import verify_claim
 from tests.conftest import insert_prices
+
+
+def test_percent_change() -> None:
+    assert percent_change(Decimal("155"), Decimal("100")) == Decimal("55")
+    assert percent_change(Decimal("90"), Decimal("100")) == Decimal("-10")
+    assert percent_change(Decimal("1"), Decimal("0")) is None
+    assert percent_change(Decimal("NaN"), Decimal("100")) is None
 
 
 def test_inclusive_bounds_and_missing_observations() -> None:

@@ -238,9 +238,11 @@ def test_news_topics_match_config() -> None:
         assert tuple(yaml.safe_load(fh)["topics"]) == NEWS_TOPICS
 
 
-def test_speech_without_segments_is_insufficient(clean_envs: dict[str, ToolEnvelope]) -> None:
+def test_speech_without_segments_is_a_soft_warning(clean_envs: dict[str, ToolEnvelope]) -> None:
+    # missing speech context must not escalate the risk gate to INVESTIGATE (CLAUDE.md §4)
     env = clean_envs["get_speech_features"]
-    assert env.status.value == "INSUFFICIENT_DATA" and env.warnings[0].code.value == "SPEECH_NOT_AVAILABLE"
+    assert env.status.value == "OK_WITH_WARNINGS" and env.warnings[0].code.value == "SPEECH_NOT_AVAILABLE"
+    assert env.warnings[0].severity.value == "soft"
 
 
 def test_missing_peers_are_warned_not_fatal(clean_envs: dict[str, ToolEnvelope]) -> None:
@@ -284,7 +286,11 @@ def test_gate_rules(clean: ToolContext, clean_envs: dict[str, ToolEnvelope]) -> 
     assert tiny and res["gate"] == "INVESTIGATE"
     assert set(res["allowed_actions"]) == {"INVESTIGATE", "WATCH", "REJECT_SIGNAL", "ANALYSIS_UNSAFE"}
     speech = clean_envs["get_speech_features"].model_dump(mode="json")
-    assert _gate(clean, [speech])["gate"] == "INVESTIGATE"
+    assert _gate(clean, [speech])["gate"] == "PASS_WITH_WARNINGS"  # missing speech context is a soft warning
+    starved = json.loads(json.dumps(speech))
+    starved["status"] = "INSUFFICIENT_DATA"
+    starved = ToolEnvelope.model_validate(starved).finalize().model_dump(mode="json")
+    assert _gate(clean, [starved])["gate"] == "INVESTIGATE"  # any tool reporting INSUFFICIENT_DATA still escalates
 
 
 def test_evidence_bundle(clean: ToolContext, clean_envs: dict[str, ToolEnvelope]) -> None:

@@ -36,6 +36,13 @@ def quoted_percent_bounds(quote: str) -> tuple[Decimal, Decimal] | None:
     return value - tolerance, value + tolerance
 
 
+def percent_change(current: Decimal, base: Decimal) -> Decimal | None:
+    """Change of `current` over `base` in percent (55.6643 = %55,6643); None for a non-finite or non-positive base."""
+    if not current.is_finite() or not base.is_finite() or base <= 0:
+        return None
+    return 100 * (current / base - 1)
+
+
 def compare_observation(observed: Decimal | None, lower: Decimal, upper: Decimal) -> Verdict:
     """Compare a value to explicitly supplied inclusive bounds in the same unit."""
     if not lower.is_finite() or not upper.is_finite() or lower > upper:
