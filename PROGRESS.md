@@ -10,11 +10,13 @@ Git for Windows ve uv kuruldu. Uzak dal yerelde izleniyor. Atomik checkpoint yaz
 
 Python 3.12.16 ve kilitli 76 paket hazır. Release DB için SQLite `quick_check` sonucu `ok`. Son işlem günü 19 Kasım 2026 ve konuşma segmenti sayısı 0. pytest 334/334, Ruff lint ve format başarılı, mypy 75 kaynak dosyasında temiz, şablonla golden 5/5. Testler `.venv` içerisindeki araçlarla çalıştırıldı.
 
-Ollama 0.40.17 kuruldu ve arşivi doğrulandı. GGUF'un ilk parçası SHA-256 kontrolünü geçti. İnternet kesintisi ikinci parçanın ilk denemesini sonlandırdı. İndirme 604.360.320 bayttan yeniden başlatıldı. Yerel model kaydı ve LLM'li Harness duman testi bekliyor.
+Ollama 0.40.17 kuruldu. Ağ kesintileri sonrası devam eden üç parçalı GGUF indirmesi tamamlandı. Birleştirilmiş 4.482.403.040 baytlık dosyanın SHA-256 değeri Release ile eşleşti. `bist-analist:latest` yerel Ollama'ya kaydedildi. `/api/show` üzerinden modelin kayıtlı GGUF kimliği doğrulandı. Ollama yalnızca `127.0.0.1:11434` üzerinde çalışıyor ve bulut erişimi kapalı.
+
+Yerel Harness V07 uçtan uca testi 273,7 saniyede geçti. Hafta örüntüsü doğru tanındı, model dört araç çağrısı planladı, geçersiz çağrı görülmedi ve açıklama ilk denetimden geçti. Koşu sırasında Ollama CPU/GPU dağılımını %58/%42 olarak gösterdi. Test komutu `.venv\Scripts\python.exe -m eval.robustness --set v2 --e2e --only V07 --models bist-analist --intent llm --out .assets/baseline-smoke`. Yerel sonuç `.assets/baseline-smoke/v2/e2e_bist-analist.json` dosyasında.
 
 ## Sonraki adım
 
-`CHECKPOINT.json` ve Git durumunu doğrula. GGUF ve Ollama indirmelerini tamamla, modelin yerel kaydını ve LLM'li Harness duman testini yap. Çalışma süresini ve sonucu kaydet. Başlangıç fazı doğrulandıktan sonra Egemen onayıyla transkript hazırlığına geç.
+Kurulum ve başlangıç doğrulaması tamamlandı. `CLAUDE.md` §12 uyarınca Egemen'in aşama geçiş onayıyla sabit listedeki videoların transkript hazırlığına ve ingest'e geç.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. JSON doğrulaması başarısız olursa `git show HEAD:CHECKPOINT.json` ile son yerel Git kaydını oku ve dosya sağlama toplamlarını yeniden kontrol et. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
 
