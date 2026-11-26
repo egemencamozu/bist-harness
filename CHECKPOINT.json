@@ -102,6 +102,12 @@
                                                     "updated_at":  "2026-11-26T15:20:48.5135117+00:00",
                                                     "fingerprint":  "997c153e447bf82f87829785c71b8ed13e612bd917d275a5c7809bdb6d394721",
                                                     "detail":  "337 tests passed; verified a live local proposal against its source segment. Full extraction and human review pending."
-                                                }
+                                                },
+                    "speech.extract.fb":  {
+                                              "status":  "completed",
+                                              "updated_at":  "2026-11-26T15:58:21.1470574+00:00",
+                                              "fingerprint":  "49df6f01a655cde67403607f09daee678183669dcb3f98d44ee193aaad221a12",
+                                              "detail":  "Five FB videos, 50 segments, 54 indexed candidates with verified quotes. Human decision pending."
+                                          }
                 }
 }

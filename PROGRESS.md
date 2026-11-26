@@ -28,6 +28,8 @@ Egemen üçüncü aşamaya geçişi onayladı. `bist-analist` ile 181 segmentin 
 
 337 test, Ruff lint ve format ile mypy geçti. Testlerde bozulan çıkarımın tekrar denenebilmesi, değişen girdinin önbelleği geçersiz kılması, insan kararının korunması ve yalnız onaylı iddianın video yayın tarihi itibarıyla PIT okumasına girmesi denetlendi.
 
+Beş Finans ve Borsa videosunun 50 segmenti tamamlandı. 54 adayın kayıt kimliği ve alıntısı gerçek segmentle doğrulandı. Numaralı insan inceleme listesi `.assets/fb-iddia-inceleme.txt` dosyasında. Numara sırası `.assets/fb-iddia-inceleme-indeks.txt` içinde iddia kimliğine bağlandı. TCMB ve Fed çıkarımı sürerken bu listedeki onaylar alınabilir. Belirtilmeyen iddialar beklemede kalır.
+
 Çıkarımı sürdürmek için etkin bir kopya olmadığını doğrula ve `.venv\Scripts\python.exe -m bistharness.harness.claims --as-of 2026-11-26` çalıştır. Arka plan günlüğü `.assets/speech-extraction.stderr.log` dosyasında. Kaynak alıntıları ve kararlar `data/manual/claims/<source_id>.jsonl` içinde yerelde kalır.
 
 Tam koşu tamamlandıktan sonra insan incelemesinde yalnız `reviewed` (onay için `true`, ret için `false`, bekleyen için `null`), `review_note` ve örneklemde `audit` alanlarını düzenle. Örneklemi `.venv\Scripts\python.exe -m eval.speech_review_audit --list` ile listele. Örnek kayıtları `correct`, `partial` veya `incorrect` olarak değerlendir ve kesinlik ile Wilson aralığını aynı komutla ölç. Ardından onaylı dosyaları yeni bir snapshot adıyla `speech --include-reviews` yolundan ingest et ve PIT çıktısını doğrula. Finansal iddia doğrulaması dördüncü aşamanın ayrı onayını bekler.
