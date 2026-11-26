@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -85,6 +85,18 @@ def test_disclosure_on_as_of_evening_counts_as_known(fund_conn: sqlite3.Connecti
     assert "2026Q2" not in set(df_prev["fiscal_period"])
 
 
+def test_intraday_cutoff_filters_before_selecting_a_fundamental_revision(fund_conn: sqlite3.Connection) -> None:
+    _fund(fund_conn, "2026Q2", "2026-08-14 21:00:00", "revenue", 999.0)
+    repo = PITRepository(fund_conn)
+    cutoff = datetime(2026, 8, 14, 19, 2, 11)
+    before = repo.fundamentals("TUPRS", as_of="2026-08-14", knowledge_cutoff=cutoff).data
+    assert before.set_index("fiscal_period").loc["2026Q2", "value"] == 210.0
+    earlier = repo.fundamentals("TUPRS", as_of="2026-08-13", knowledge_cutoff=cutoff).data
+    assert "2026Q2" not in set(earlier["fiscal_period"])
+    with pytest.raises(ValueError, match="Istanbul"):
+        repo.fundamentals("TUPRS", as_of="2026-08-14", knowledge_cutoff=cutoff.replace(tzinfo=UTC))
+
+
 def test_nan_restatement_is_not_hidden_by_older_value(mem_conn: sqlite3.Connection) -> None:
     _fund(mem_conn, "2026Q2", "2026-08-14 19:00:00", "ebitda", 50.0)
     _fund(mem_conn, "2026Q2", "2026-08-20 19:00:00", "ebitda", None)
@@ -131,6 +143,9 @@ def test_macro_uses_release_time_not_observation_date(mem_conn: sqlite3.Connecti
     assert df.iloc[0]["value"] == 33.0
     later = repo.macro("TUFE_YOY", "2026-01-01", "2026-12-31", as_of=date(2026, 10, 31)).data
     assert later.set_index("obs_date").loc["2026-08-01", "value"] == 33.4
+    intraday = repo.macro("TUFE_YOY", as_of="2026-10-05", knowledge_cutoff=datetime(2026, 10, 5, 9)).data
+    assert list(intraday["obs_date"]) == ["2026-08-01"]
+    assert intraday.iloc[0]["value"] == 33.0
 
 
 def test_news_after_as_of_is_invisible(mem_conn: sqlite3.Connection) -> None:

@@ -129,8 +129,14 @@
     },
     "speech.phase4": {
       "status": "in_progress",
-      "updated_at": "2026-11-26T18:18:38.5932282+00:00",
+      "updated_at": "2026-11-26T21:18:38.5932282+03:00",
       "detail": "Egemen approved starting phase 4. Screened 12 claims and tested ENKAI against pre-publication KAP data. Awaiting methodology and tool contract decisions."
+    },
+    "speech.phase4.pit": {
+      "status": "completed",
+      "updated_at": "2026-11-26T18:20:46.9841828+00:00",
+      "fingerprint": "aee2722e09bb900d13b17ebd6551c28345ee6b4f04a9bb0231c1a99ca49a7ed2",
+      "detail": "Intraday knowledge cutoff filters KAP and macro revisions before selecting latest rows. 46 targeted tests passed."
     }
   }
 }

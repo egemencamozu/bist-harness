@@ -22,6 +22,8 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
+PITRepository'nin KAP ve makro okumalarına isteğe bağlı İstanbul saati sınırı eklendi. Sınır SQL'de revizyon seçilmeden önce uygulanır ve as_of gün sonunu aşamaz. 46 PIT, doğrulama ve mevcut araç testi, Ruff ve mypy geçti. Bu destek mevcut araç sözleşmelerine eklenmedi.
+
 Üçüncü aşama tamamlandı. 181 segmentten 276 aday çıktı. Egemen'in 12 onayı `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı doğrulandı. Dördüncü aşamada `analytics/claims.py` içinde birimi eşleştirilmiş gözlem için kapsayıcı aralık kontrolü ve seçili işlem günü başlangıcı için as_of tarihine kilitli ileri pencere eklendi. 28 odaklı test, Ruff ve mypy geçti.
 
 Egemen dördüncü aşamaya başlamayı onayladı. 12 onaylı aday incelendi. ENKAI yıllık hasılat örneği, video yayımlanmadan önce açıklanan 1566104 numaralı KAP raporunun aynı konsolide tablosundaki 12 aylık cari ve önceki değerlerle tekrar hesaplandı. Gözlem %55,6643, söylenen %55. Tam yüzde için ±0,5 yüzde puanı uygulanırsa gözlem aralığın dışında kalır. Bu bir yöntem denemesidir. Diğer adaylarda özel skor tanımı, açık tahmin ufku, belirli metrik veya bağlam eksikliği görüldü.

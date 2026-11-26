@@ -49,5 +49,15 @@ def as_of_end_of_day(as_of: date) -> str:
     return f"{as_of.strftime(DATE_FMT)} 23:59:59"
 
 
+def knowledge_bound(as_of: date, cutoff: datetime | None) -> str:
+    """Clamp a local Istanbul timestamp to the mandatory analysis date."""
+    end_of_day = as_of_end_of_day(as_of)
+    if cutoff is None:
+        return end_of_day
+    if cutoff.tzinfo is not None:
+        raise ValueError("knowledge_cutoff must be a naive Istanbul-local datetime")
+    return min(end_of_day, cutoff.strftime(DATETIME_FMT))
+
+
 def fmt_date(d: date) -> str:
     return d.strftime(DATE_FMT)

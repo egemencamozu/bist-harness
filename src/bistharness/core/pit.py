@@ -13,14 +13,14 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from bistharness.core.calendar import TradingCalendar
-from bistharness.core.dates import as_of_end_of_day, fmt_date, require_as_of, to_date
+from bistharness.core.dates import as_of_end_of_day, fmt_date, knowledge_bound, require_as_of, to_date
 from bistharness.core.enums import Severity, WarningCode
 from bistharness.core.errors import DataNotFoundError, LookAheadError
 from bistharness.core.schemas import WarningItem
@@ -232,6 +232,7 @@ class PITRepository:
         role: str | None = "current",
         durations: Sequence[str] | None = None,
         latest_only: bool = True,
+        knowledge_cutoff: datetime | None = None,
     ) -> PITFrame:
         """Fundamental values disclosed on KAP up to as_of (knowledge time = disclosure_datetime).
 
@@ -244,7 +245,7 @@ class PITRepository:
         a = require_as_of(as_of)
         s, e, warnings = self._clamp(start, end, a)
         assert e is not None
-        bound = as_of_end_of_day(a)
+        bound = knowledge_bound(a, knowledge_cutoff)
         params: list[Any] = [ticker, f"{fmt_date(e)} 23:59:59", bound]
         sql = (
             f"SELECT {self._FUND_COLS} FROM fundamentals "
@@ -310,13 +311,21 @@ class PITRepository:
         return None if row is None else str(row[0])
 
     # ------------------------------------------------------------------ macro
-    def macro(self, series_codes: Sequence[str] | str, start: Any = None, end: Any = None, *, as_of: Any) -> PITFrame:
+    def macro(
+        self,
+        series_codes: Sequence[str] | str,
+        start: Any = None,
+        end: Any = None,
+        *,
+        as_of: Any,
+        knowledge_cutoff: datetime | None = None,
+    ) -> PITFrame:
         """Latest released value (<= as_of) per (series, observation date). start/end filter obs_date."""
         a = require_as_of(as_of)
         codes = [series_codes] if isinstance(series_codes, str) else list(series_codes)
         s, e, warnings = self._clamp(start, end, a)
         assert e is not None
-        bound = as_of_end_of_day(a)
+        bound = knowledge_bound(a, knowledge_cutoff)
         params: list[Any] = [*codes, fmt_date(e), bound]
         sql = (
             "SELECT series_code, obs_date, value, release_datetime, source, source_ref FROM macro_observations "
