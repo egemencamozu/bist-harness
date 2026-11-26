@@ -10,6 +10,8 @@
 - [x] Başlangıç pytest, Ruff lint/format, mypy ve şablonlu golden değerlendirmesini doğrula.
 - [ ] Ollama arşivini ve Release GGUF'u tamamla ve doğrula. Yerel model kaydı ve LLM/Harness duman testi yap.
 
+Ollama ve ilk GGUF parçası doğrulandı. İkinci parça ağ kesintisi sonrası kaldığı bayttan sürüyor. Üçüncü parça ve yerel model testi bekliyor.
+
 ## 2. Transkript ve ingest
 
 - [ ] Sabit listedeki beş FB transkriptini ve mevcutsa TCMB/Fed altyazı ve resmî metinlerini rehbere göre hazırla. Donmuş ingest ve etiketleri doğrula.

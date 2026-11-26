@@ -21,6 +21,32 @@ function Test-AssetHash([string]$Path, [string]$Expected) {
         ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq $Expected)
 }
 
+function Receive-AssetBytes($Asset, [string]$Partial, [long]$Offset) {
+    $retryableErrors = @(5, 6, 7, 18, 28, 35, 52, 55, 56)
+    $delay = 5
+    for ($attempt = 1; $attempt -le 12; $attempt++) {
+        Write-Host "Downloading $($Asset.name) from byte $Offset of $($Asset.size)"
+        $options = @('--fail', '--location', '--silent', '--show-error', '--connect-timeout', '30',
+            '--speed-time', '60', '--speed-limit', '1024', '--continue-at', $Offset, '--output', $Partial)
+        curl.exe @options $Asset.browser_download_url
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) { return }
+        if ($exitCode -notin $retryableErrors -or $attempt -eq 12) {
+            throw "curl exit $exitCode for $($Asset.name); partial retained"
+        }
+
+        $Offset = 0
+        if (Test-Path -LiteralPath $Partial) {
+            $Offset = (Get-Item -LiteralPath $Partial).Length
+            if ($Offset -eq $Asset.size) { return }
+            if ($Offset -gt $Asset.size) { throw "Partial file exceeds the Release size for $($Asset.name)" }
+        }
+        Write-Host "Network interruption (curl $exitCode); retrying in $delay seconds."
+        Start-Sleep -Seconds $delay
+        $delay = [Math]::Min($delay * 2, 60)
+    }
+}
+
 function Receive-ReleaseAsset($Asset, [string]$PartialPath) {
     $name = $Asset.name
     if ($Asset.digest -notmatch '^sha256:([0-9a-f]{64})$' -or
@@ -41,11 +67,7 @@ function Receive-ReleaseAsset($Asset, [string]$PartialPath) {
             if (Test-Path -LiteralPath $partial) { $partialSize = (Get-Item -LiteralPath $partial).Length }
             if ($partialSize -ne $Asset.size -or !(Test-AssetHash $partial $hash)) {
                 $offset = if ($partialSize -lt $Asset.size) { $partialSize } else { 0 }
-                Write-Host "Downloading $name from byte $offset of $($Asset.size)"
-                $options = @('--fail', '--location', '--silent', '--show-error', '--connect-timeout', '30',
-                    '--speed-time', '60', '--speed-limit', '1024', '--continue-at', $offset, '--output', $partial)
-                curl.exe @options $Asset.browser_download_url
-                if ($LASTEXITCODE -ne 0) { throw "curl exit $LASTEXITCODE for $name; partial retained" }
+                Receive-AssetBytes $Asset $partial $offset
             }
             if ((Get-Item -LiteralPath $partial).Length -ne $Asset.size -or !(Test-AssetHash $partial $hash)) {
                 throw "Release size or SHA-256 mismatch for $name"

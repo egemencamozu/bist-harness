@@ -10,13 +10,15 @@ Git for Windows ve uv kuruldu. Uzak dal yerelde izleniyor. Atomik checkpoint yaz
 
 Python 3.12.16 ve kilitli 76 paket hazır. Release DB için SQLite `quick_check` sonucu `ok`. Son işlem günü 19 Kasım 2026 ve konuşma segmenti sayısı 0. pytest 334/334, Ruff lint ve format başarılı, mypy 75 kaynak dosyasında temiz, şablonla golden 5/5. Testler `.venv` içerisindeki araçlarla çalıştırıldı.
 
-Ollama 0.40.17 arşivi ile GGUF parça indirmesi başladı. Son ölçümde sırasıyla yaklaşık 206 MiB ve ilk GGUF parçasında 232 MiB kısmi çıktı vardı. Yerel model kaydı ve LLM'li Harness duman testi tamamlanmayı bekliyor. Kısmi bayt sayısını `.assets/` altındaki ilgili dosyadan kontrol et.
+Ollama 0.40.17 kuruldu ve arşivi doğrulandı. GGUF'un ilk parçası SHA-256 kontrolünü geçti. İnternet kesintisi ikinci parçanın ilk denemesini sonlandırdı. İndirme 604.360.320 bayttan yeniden başlatıldı. Yerel model kaydı ve LLM'li Harness duman testi bekliyor.
 
 ## Sonraki adım
 
 `CHECKPOINT.json` ve Git durumunu doğrula. GGUF ve Ollama indirmelerini tamamla, modelin yerel kaydını ve LLM'li Harness duman testini yap. Çalışma süresini ve sonucu kaydet. Başlangıç fazı doğrulandıktan sonra Egemen onayıyla transkript hazırlığına geç.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. JSON doğrulaması başarısız olursa `git show HEAD:CHECKPOINT.json` ile son yerel Git kaydını oku ve dosya sağlama toplamlarını yeniden kontrol et. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
+
+Geçici ağ hatasında indirme artan beklemelerle toplam 12 denemeye kadar otomatik sürdürülür. Her deneme diskteki gerçek bayt sayısından başlar. Denemeler tükenirse kısmi dosya ve doğrulanmış parçalar korunur. Arka planda başlatılan model işinin kayıtları `.assets/model-resume.stdout.log` ve `.assets/model-resume.stderr.log` dosyalarında.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1 -OllamaRuntime` sabit sürümün Windows paketini doğrulayıp `.tools/ollama-0.40.17` altına açar. WinGet bu sürümü listelemedi. Proje bağımlılıkları için `UV_CACHE_DIR=.tools/uv-cache` ve `UV_PYTHON_INSTALL_DIR=.tools/python` ortam değişkenlerini proje kökünü baz alarak ayarla. `uv sync --locked --python 3.12 --extra dev --extra llm --extra ui --extra mcp` komutuyla aynı ortamı sürdür.
 
