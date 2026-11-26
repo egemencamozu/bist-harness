@@ -1,0 +1,28 @@
+{
+  "source": "speech",
+  "snapshot": "2026-11-27",
+  "created_at_utc": "2026-11-26T17:38:27Z",
+  "params": {
+    "segment_seconds": 60.0
+  },
+  "files": {
+    "claims/fb_20260121_paragirisi.jsonl": "c4897d5474ada6cc47a3d4dbcb56a899a7785e8fb1e76e218f8047fa9cf358b8",
+    "claims/fb_20260305_bilanco.jsonl": "9318a333546ad16be1a073e192f8382d90cdcde471ed25e2578812067b8e7d64",
+    "claims/fb_20260305_bofa.jsonl": "c6b678e19482d7c31d1c82bb296bd58f1dac3d4c2e7e9a59e89cd1f711d1a652",
+    "claims/fb_20260306_yabanci.jsonl": "8d58f3c5ce260a3a69dbbf9975382528731be21340dac0bde8b943c3c1e8d91b",
+    "claims/fb_20260307_savas.jsonl": "041e27fc8a420b8f8bb634f41c5aac42b23b95b9a4c031d1be22d2dd16ff3779",
+    "claims/fed_20260729_presconf.jsonl": "164227b4456fe11e168ea68ed910ec13fd471165c7f5169159dcac8565d01a20",
+    "claims/tcmb_20260813_er3.jsonl": "e452326144aaae0592ce80135a42242c41d7e18aad4363c907c251a5742fa1e8",
+    "transcripts/fb_20260121_paragirisi.txt": "d13216c0de89a5ce185b08cecbfb5c050cb6a94f245c5808d43b5dfc40999187",
+    "transcripts/fb_20260305_bilanco.txt": "2a4594609611d8c1d1666b05211be8b5c497b23df44ed373ea59bce6535a076d",
+    "transcripts/fb_20260305_bofa.txt": "9694c9951e41934a9600ca3ca7e93edaad1a94bbc3121fe07945f9d3db7e418c",
+    "transcripts/fb_20260306_yabanci.txt": "d112c94356e7c506ad4f28d9c8c4f86bb6c23b64d11ae64228dbb9d7c106a4a8",
+    "transcripts/fb_20260307_savas.txt": "156654082fef3183ccd5a657febb7e35603ed55873bd8eef017bf859617feb14",
+    "transcripts/fed_20260729_presconf.official.txt": "e23cca29d6c418dbfc9b4af802e7fe1e152aeb76c009adbef770c545d3fd70b6",
+    "transcripts/fed_20260729_presconf.txt": "c8b43d5181df1491f7d5a165475caea88633d37633c7271a916aa757829969a2",
+    "transcripts/tcmb_20260813_er3.official.txt": "4dc1c8be09389869bf99def6700d3ef58cf6ea3f15da4623feb369976050cfa4",
+    "transcripts/tcmb_20260813_er3.txt": "75a58396189dcca897d0d4834874a20e74f2c4301ba9d40fdff3e10a07fbe0b6",
+    "videos.csv": "88e1942ee235573a9e5542054f7f0c6c855bc8d29fe4b731dc9eb0a3fa8a0911"
+  },
+  "content_sha256": "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200"
+}

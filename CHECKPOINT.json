@@ -91,12 +91,6 @@
                                           "fingerprint":  "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
                                           "detail":  "speech-2026-11-26-45f5eb9c38: seven videos, 181 segments, 10 manifest inputs, publication-date checks and all 334 tests passed."
                                       },
-                    "speech.extract":  {
-                                           "status":  "in_progress",
-                                           "updated_at":  "2026-11-26T15:14:10.4851182+00:00",
-                                           "fingerprint":  "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
-                                           "detail":  "Phase 3 approved by Egemen; implementing and testing grounded extraction and human approval."
-                                       },
                     "speech.extract.pipeline":  {
                                                     "status":  "completed",
                                                     "updated_at":  "2026-11-26T15:20:48.5135117+00:00",
@@ -114,6 +108,18 @@
                                              "updated_at":  "2026-11-26T16:05:14.9711120+00:00",
                                              "fingerprint":  "86df4ae1e68bb32d9fcb667da8a9ac9c6e15bbc4f76846361147caad63499fa9",
                                              "detail":  "Egemen approved 12 indexed FB candidates; 42 are pending. The approval files were read back and verified."
-                                         }
+                                         },
+                    "speech.extract":  {
+                                           "status":  "completed",
+                                           "updated_at":  "2026-11-26T17:38:46.8354555+00:00",
+                                           "fingerprint":  "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200",
+                                           "detail":  "181 segments; 276 proposals; 30 sampled for human audit."
+                                       },
+                    "speech.review.ingest":  {
+                                                 "status":  "completed",
+                                                 "updated_at":  "2026-11-26T17:38:46.8866001+00:00",
+                                                 "fingerprint":  "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200",
+                                                 "detail":  "12 reviewed claims imported; checked all publication dates."
+                                             }
                 }
 }

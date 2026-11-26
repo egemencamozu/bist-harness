@@ -22,8 +22,9 @@
 - [x] Egemen'in üçüncü aşama geçiş onayını al.
 - [x] Yerel çıkarımı, birebir kaynak doğrulamasını ve segment bazlı kesintiden devamı doğrula (337 test geçti).
 - [x] Finans ve Borsa'nın beş videosunda 50 segmenti ve 54 inceleme adayının kaynak bağlantısını doğrula.
-- [ ] Fed ve TCMB'nin çıkarımını tamamla, tüm kaynaklar için denetim örneklemini hazırla.
-- [ ] İnsan kararlarını değerlendir (Finans ve Borsa'da 12 onay, 42 aday bekliyor), kesinliği ölç ve onaylı kayıtların PIT ingest'ini doğrula.
+- [x] Fed ve TCMB dahil 181 segmentin çıkarımını tamamla ve 30 adaylık denetim örneklemini hazırla.
+- [x] İnsan tarafından onaylanan 12 iddiayı dondur, aktar ve yayın tarihi sınırını doğrula.
+- [ ] 30 denetim etiketini al ve kesinliği Wilson aralığıyla ölç.
 
 ## 4. Deterministik doğrulama ve Point-in-Time
 

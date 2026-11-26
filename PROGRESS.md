@@ -22,6 +22,8 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
+Yerel çıkarım tamamlandı (181 segment, 276 aday). 12 onay `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı ayrı ayrı doğrulandı. 30 adaylık denetim listesi `.assets/iddia-kesinlik-orneklemi.txt` dosyasında. Etiketler gelince Wilson aralığını hesapla.
+
 Egemen üçüncü aşamaya geçişi onayladı. `bist-analist` ile 181 segmentin çıkarımı arka planda çalışıyor. `DURUM.cmd` işlenen segmentleri ve biriken inceleme adaylarını gösterir. Tamamlanan her segmentin girdisi, model kimliği, şeması ve çıkarım ayarlarıyla eşleşen sonuç, `.assets/speech-extraction.sqlite` dosyasından yeniden kullanılır. Geçersiz model yanıtı yeniden denenebilir kalır.
 
 İlk denemede modelin serbest yazdığı konu adları ve alıntılar gereksiz retlere yol açtı. Üretim koşusunda model aday listesinden konuyu ve numaralı kaynak pasajını seçiyor. Kod alıntıyı doğrudan segmentten alır. İlk gerçek adayın kaynak içeriği ve kimliği doğrulandı, insan kararı bekliyor.
