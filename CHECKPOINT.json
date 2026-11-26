@@ -129,8 +129,9 @@
     },
     "speech.phase4": {
       "status": "pending",
-      "updated_at": "2026-11-26T17:40:43.8933415+00:00",
-      "detail": "Wait for Egemen to explicitly resume phase 4."
+      "updated_at": "2026-11-26T17:42:42.9661965+00:00",
+      "fingerprint": "4d21f34d21981b16a6a1a9004e3068cf3f91f67be16a4fc96e232330d6d05270",
+      "detail": "Pure bound and as-of window checks tested. Awaiting explicit approval of methodology and tool contract."
     }
   }
 }

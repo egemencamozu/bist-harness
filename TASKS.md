@@ -28,6 +28,8 @@
 
 ## 4. Deterministik doğrulama ve Point-in-Time
 
+- [x] Sayısal sınır karşılaştırmasını ve ileri işlem penceresinin tarih kilidini saf hesaplama olarak test et.
+
 - [ ] Egemen'in onayladığı doğrulama metodolojisi ve araç sözleşmesiyle deterministik doğrulama ve PIT testleri.
 
 ## 5. MCP ve Harness entegrasyonu

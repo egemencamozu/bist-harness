@@ -22,7 +22,9 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
-Üçüncü aşama tamamlandı. 181 segmentten 276 aday çıktı. Egemen'in 12 onayı `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı doğrulandı. Kullanıcının talimatı gereği dördüncü aşama beklemede.
+Üçüncü aşama tamamlandı. 181 segmentten 276 aday çıktı. Egemen'in 12 onayı `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı doğrulandı. Dördüncü aşamada `analytics/claims.py` içinde birimi eşleştirilmiş gözlem için kapsayıcı aralık kontrolü ve seçili işlem günü başlangıcı için as_of tarihine kilitli ileri pencere eklendi. 28 odaklı test, Ruff ve mypy geçti.
+
+Devam noktası, doğrulama metodolojisi ve araç sözleşmesi için Egemen'in açık onayını almak. Özellikle yayın saatinin işlem penceresine bağlanması ve alıntılardaki birim/hassasiyetin KAP veya makro verisiyle eşlenmesi henüz karara bağlanmadı. Mevcut `get_speech_features` çıktı genişletmesi ve yeni araç seçenekleri açık.
 
 Kodla seçilen 30 adaylık örneklem (tohum 42) Codex tarafından alıntı, çevre metni, konu ve iddia alanları üzerinden denetlendi. 2 doğru, 19 kısmen doğru, 9 yanlış. Katı kesinlik %6,7 (Wilson %95 GA %1,8–21,3), geniş kesinlik %70,0 (GA %52,1–83,3). Kısmi eşleşmelerde yön, metrik ve bağlam eksikleri görüldü. Yanlışlar arasında muhabir sorularının iddia sayılması ve şirket ifadesinin sektöre genellenmesi var. Denetim etiketleri `.assets/iddia-kesinlik-denetimi.json` içinde ve Egemen'in onaylarından ayrı tutuluyor.
 
