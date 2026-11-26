@@ -29,6 +29,7 @@
 ## 4. Deterministik doğrulama ve Point-in-Time
 
 - [x] Sayısal sınır karşılaştırmasını ve ileri işlem penceresinin tarih kilidini saf hesaplama olarak test et.
+- [x] 12 onaylı iddianın veri uygunluğunu incele ve ENKAI örneğinde yayın öncesi KAP karşılaştırmasını sınama amaçlı hesapla.
 
 - [ ] Egemen'in onayladığı doğrulama metodolojisi ve araç sözleşmesiyle deterministik doğrulama ve PIT testleri.
 

@@ -128,10 +128,9 @@
       "detail": "Codex audited 30 sampled proposals: 2 correct, 19 partial, 9 incorrect. Egemen approvals separate. Phase 4 paused by user."
     },
     "speech.phase4": {
-      "status": "pending",
-      "updated_at": "2026-11-26T17:42:42.9661965+00:00",
-      "fingerprint": "4d21f34d21981b16a6a1a9004e3068cf3f91f67be16a4fc96e232330d6d05270",
-      "detail": "Pure bound and as-of window checks tested. Awaiting explicit approval of methodology and tool contract."
+      "status": "in_progress",
+      "updated_at": "2026-11-26T18:18:38.5932282+00:00",
+      "detail": "Egemen approved starting phase 4. Screened 12 claims and tested ENKAI against pre-publication KAP data. Awaiting methodology and tool contract decisions."
     }
   }
 }
