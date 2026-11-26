@@ -1,125 +1,131 @@
 {
-    "schema_version":  1,
-    "branch":  "feature/speech-layer",
-    "baseline_commit":  "1f1d00f6997b0b880219809f162b9c6a8cf4836b",
-    "entries":  {
-                    "discovery":  {
-                                      "status":  "completed",
-                                      "detail":  "Repository, hardware, documentation and relevant implementation reviewed."
-                                  },
-                    "checkpoint":  {
-                                       "status":  "completed",
-                                       "updated_at":  "2026-11-26T13:00:13.3649742+00:00",
-                                       "fingerprint":  "01ef3102a83341eea16f2280a9f3fd94fde8da58cd400e498e0843bdfeed231f",
-                                       "detail":  "Atomic replacement, exclusive writer, orphan handling and fingerprint update verified."
-                                   },
-                    "baseline.static":  {
-                                            "status":  "completed",
-                                            "updated_at":  "2026-11-26T13:11:45.3683620+00:00",
-                                            "fingerprint":  "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
-                                            "detail":  "Python 3.12.16, 334 tests, Ruff lint and format, mypy (75 files), template golden 5/5 and SQLite quick_check OK."
-                                        },
-                    "ollama.runtime":  {
-                                           "status":  "completed",
-                                           "updated_at":  "2026-11-26T13:51:15.0900540+00:00",
-                                           "fingerprint":  "3dd80f6e3a9699f2eadf4ac418f00529cee594df9557541806eda1f1f3f5588a",
-                                           "detail":  "Official archive checksum and executable verified."
-                                       },
-                    "download.sha256sums.txt":  {
-                                                    "status":  "completed",
-                                                    "updated_at":  "2026-11-26T14:09:59.2484630+00:00",
-                                                    "fingerprint":  "109ae082f9aa81480a8dd7a0de23a2002cc5b1486c44c3289d12acdfc9525936",
-                                                    "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
-                                                },
-                    "download.bist.sqlite.gz":  {
-                                                    "status":  "completed",
-                                                    "updated_at":  "2026-11-26T14:09:59.3265756+00:00",
-                                                    "fingerprint":  "79ea6b72539712a68f6065582366b8017d3a86187d250c6983836cb7f2ff623c",
-                                                    "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
-                                                },
-                    "install.bist.sqlite":  {
-                                                "status":  "completed",
-                                                "updated_at":  "2026-11-26T14:09:59.4359392+00:00",
-                                                "fingerprint":  "78569c236e376428b017eb4cf571a2040c4971c115282a1e799839df9d1501d1",
-                                                "detail":  "Installed SHA-256 verified against assets-2026-11-20."
-                                            },
-                    "download.bist-4b-q8_0.gguf.part0":  {
-                                                             "status":  "completed",
-                                                             "updated_at":  "2026-11-26T14:10:00.8154197+00:00",
-                                                             "fingerprint":  "69db0bc816a532a96b9edf8661d6a49f3e0e0403288dc784ba6976e5369202f4",
-                                                             "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
-                                                         },
-                    "download.bist-4b-q8_0.gguf.part1":  {
-                                                             "status":  "completed",
-                                                             "updated_at":  "2026-11-26T14:24:14.6130312+00:00",
-                                                             "fingerprint":  "54e2aae14b5b88efeef70773cab445bf67c3c7d9887e281de97a8ea14e35fc39",
-                                                             "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
-                                                         },
-                    "download.bist-4b-q8_0.gguf.part2":  {
-                                                             "status":  "completed",
-                                                             "updated_at":  "2026-11-26T14:34:19.4062154+00:00",
-                                                             "fingerprint":  "c291a2551d9b0132478f0e1dc75b4a36312d91465b0c7754a501065174d8ca89",
-                                                             "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
-                                                         },
-                    "install.bist-4b-q8_0.gguf":  {
-                                                      "status":  "completed",
-                                                      "updated_at":  "2026-11-26T14:34:25.4332995+00:00",
-                                                      "fingerprint":  "747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201",
-                                                      "detail":  "Installed SHA-256 verified against assets-2026-11-20."
-                                                  },
-                    "ollama.model":  {
-                                         "status":  "completed",
-                                         "updated_at":  "2026-11-26T14:36:06.2464652+00:00",
-                                         "fingerprint":  "747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201",
-                                         "detail":  "Ollama 0.40.17 model source matches the verified Release GGUF."
-                                     },
-                    "baseline.local-model":  {
-                                                 "status":  "completed",
-                                                 "updated_at":  "2026-11-26T14:41:28.8803398+00:00",
-                                                 "fingerprint":  "747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201",
-                                                 "detail":  "V07 passed in 273,7s, 4 model-planned tool calls, no invalid calls, first-pass validation and no fallback."
-                                             },
-                    "baseline":  {
-                                     "status":  "completed",
-                                     "updated_at":  "2026-11-26T14:41:28.9913085+00:00",
-                                     "fingerprint":  "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
-                                     "detail":  "Static checks, Release integrity, local registration and end-to-end Harness smoke test passed."
-                                 },
-                    "speech.ingest":  {
-                                          "status":  "completed",
-                                          "updated_at":  "2026-11-26T14:52:44.3508148+00:00",
-                                          "fingerprint":  "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
-                                          "detail":  "speech-2026-11-26-45f5eb9c38: seven videos, 181 segments, 10 manifest inputs, publication-date checks and all 334 tests passed."
-                                      },
-                    "speech.extract.pipeline":  {
-                                                    "status":  "completed",
-                                                    "updated_at":  "2026-11-26T15:20:48.5135117+00:00",
-                                                    "fingerprint":  "997c153e447bf82f87829785c71b8ed13e612bd917d275a5c7809bdb6d394721",
-                                                    "detail":  "337 tests passed; verified a live local proposal against its source segment. Full extraction and human review pending."
-                                                },
-                    "speech.extract.fb":  {
-                                              "status":  "completed",
-                                              "updated_at":  "2026-11-26T15:58:21.1470574+00:00",
-                                              "fingerprint":  "49df6f01a655cde67403607f09daee678183669dcb3f98d44ee193aaad221a12",
-                                              "detail":  "Five FB videos, 50 segments, 54 indexed candidates with verified quotes. Human decision pending."
-                                          },
-                    "speech.review.fb":  {
-                                             "status":  "in_progress",
-                                             "updated_at":  "2026-11-26T16:05:14.9711120+00:00",
-                                             "fingerprint":  "86df4ae1e68bb32d9fcb667da8a9ac9c6e15bbc4f76846361147caad63499fa9",
-                                             "detail":  "Egemen approved 12 indexed FB candidates; 42 are pending. The approval files were read back and verified."
-                                         },
-                    "speech.extract":  {
-                                           "status":  "completed",
-                                           "updated_at":  "2026-11-26T17:38:46.8354555+00:00",
-                                           "fingerprint":  "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200",
-                                           "detail":  "181 segments; 276 proposals; 30 sampled for human audit."
-                                       },
-                    "speech.review.ingest":  {
-                                                 "status":  "completed",
-                                                 "updated_at":  "2026-11-26T17:38:46.8866001+00:00",
-                                                 "fingerprint":  "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200",
-                                                 "detail":  "12 reviewed claims imported; checked all publication dates."
-                                             }
-                }
+  "schema_version": 1,
+  "branch": "feature/speech-layer",
+  "baseline_commit": "1f1d00f6997b0b880219809f162b9c6a8cf4836b",
+  "entries": {
+    "discovery": {
+      "status": "completed",
+      "detail": "Repository, hardware, documentation and relevant implementation reviewed."
+    },
+    "checkpoint": {
+      "status": "completed",
+      "updated_at": "2026-11-26T16:00:13.3649742+03:00",
+      "fingerprint": "01ef3102a83341eea16f2280a9f3fd94fde8da58cd400e498e0843bdfeed231f",
+      "detail": "Atomic replacement, exclusive writer, orphan handling and fingerprint update verified."
+    },
+    "baseline.static": {
+      "status": "completed",
+      "updated_at": "2026-11-26T16:11:45.368362+03:00",
+      "fingerprint": "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
+      "detail": "Python 3.12.16, 334 tests, Ruff lint and format, mypy (75 files), template golden 5/5 and SQLite quick_check OK."
+    },
+    "ollama.runtime": {
+      "status": "completed",
+      "updated_at": "2026-11-26T16:51:15.090054+03:00",
+      "fingerprint": "3dd80f6e3a9699f2eadf4ac418f00529cee594df9557541806eda1f1f3f5588a",
+      "detail": "Official archive checksum and executable verified."
+    },
+    "download.sha256sums.txt": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:09:59.248463+03:00",
+      "fingerprint": "109ae082f9aa81480a8dd7a0de23a2002cc5b1486c44c3289d12acdfc9525936",
+      "detail": "SHA-256 verified against GitHub Release assets-2026-11-20."
+    },
+    "download.bist.sqlite.gz": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:09:59.3265756+03:00",
+      "fingerprint": "79ea6b72539712a68f6065582366b8017d3a86187d250c6983836cb7f2ff623c",
+      "detail": "SHA-256 verified against GitHub Release assets-2026-11-20."
+    },
+    "install.bist.sqlite": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:09:59.4359392+03:00",
+      "fingerprint": "78569c236e376428b017eb4cf571a2040c4971c115282a1e799839df9d1501d1",
+      "detail": "Installed SHA-256 verified against assets-2026-11-20."
+    },
+    "download.bist-4b-q8_0.gguf.part0": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:10:00.8154197+03:00",
+      "fingerprint": "69db0bc816a532a96b9edf8661d6a49f3e0e0403288dc784ba6976e5369202f4",
+      "detail": "SHA-256 verified against GitHub Release assets-2026-11-20."
+    },
+    "download.bist-4b-q8_0.gguf.part1": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:24:14.6130312+03:00",
+      "fingerprint": "54e2aae14b5b88efeef70773cab445bf67c3c7d9887e281de97a8ea14e35fc39",
+      "detail": "SHA-256 verified against GitHub Release assets-2026-11-20."
+    },
+    "download.bist-4b-q8_0.gguf.part2": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:34:19.4062154+03:00",
+      "fingerprint": "c291a2551d9b0132478f0e1dc75b4a36312d91465b0c7754a501065174d8ca89",
+      "detail": "SHA-256 verified against GitHub Release assets-2026-11-20."
+    },
+    "install.bist-4b-q8_0.gguf": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:34:25.4332995+03:00",
+      "fingerprint": "747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201",
+      "detail": "Installed SHA-256 verified against assets-2026-11-20."
+    },
+    "ollama.model": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:36:06.2464652+03:00",
+      "fingerprint": "747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201",
+      "detail": "Ollama 0.40.17 model source matches the verified Release GGUF."
+    },
+    "baseline.local-model": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:41:28.8803398+03:00",
+      "fingerprint": "747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201",
+      "detail": "V07 passed in 273,7s, 4 model-planned tool calls, no invalid calls, first-pass validation and no fallback."
+    },
+    "baseline": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:41:28.9913085+03:00",
+      "fingerprint": "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
+      "detail": "Static checks, Release integrity, local registration and end-to-end Harness smoke test passed."
+    },
+    "speech.ingest": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:52:44.3508148+03:00",
+      "fingerprint": "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
+      "detail": "speech-2026-11-26-45f5eb9c38: seven videos, 181 segments, 10 manifest inputs, publication-date checks and all 334 tests passed."
+    },
+    "speech.extract.pipeline": {
+      "status": "completed",
+      "updated_at": "2026-11-26T18:20:48.5135117+03:00",
+      "fingerprint": "997c153e447bf82f87829785c71b8ed13e612bd917d275a5c7809bdb6d394721",
+      "detail": "337 tests passed; verified a live local proposal against its source segment. Full extraction and human review pending."
+    },
+    "speech.extract.fb": {
+      "status": "completed",
+      "updated_at": "2026-11-26T18:58:21.1470574+03:00",
+      "fingerprint": "49df6f01a655cde67403607f09daee678183669dcb3f98d44ee193aaad221a12",
+      "detail": "Five FB videos, 50 segments, 54 indexed candidates with verified quotes. Human decision pending."
+    },
+    "speech.review.fb": {
+      "status": "in_progress",
+      "updated_at": "2026-11-26T19:05:14.971112+03:00",
+      "fingerprint": "86df4ae1e68bb32d9fcb667da8a9ac9c6e15bbc4f76846361147caad63499fa9",
+      "detail": "Egemen approved 12 indexed FB candidates; 42 are pending. The approval files were read back and verified."
+    },
+    "speech.extract": {
+      "status": "completed",
+      "updated_at": "2026-11-26T20:38:46.8354555+03:00",
+      "fingerprint": "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200",
+      "detail": "181 segments; 276 proposals; 30 sampled for human audit."
+    },
+    "speech.review.ingest": {
+      "status": "completed",
+      "updated_at": "2026-11-26T20:38:46.8866001+03:00",
+      "fingerprint": "edc9918a816398d96bb77f06b1f03feb38e71988e387fc90ebaf6efd4488b200",
+      "detail": "12 reviewed claims imported; checked all publication dates."
+    },
+    "speech.review.audit": {
+      "status": "completed",
+      "updated_at": "2026-11-26T17:40:30.6043251+00:00",
+      "fingerprint": "64cb4309d242fd85fd855a7519a876dd973c57cbc6a56c19bf4e9dc2d49702aa",
+      "detail": "Codex audited 30 sampled proposals: 2 correct, 19 partial, 9 incorrect. Egemen approvals separate. Phase 4 paused by user."
+    }
+  }
 }

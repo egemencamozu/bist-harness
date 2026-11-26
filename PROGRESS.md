@@ -22,7 +22,9 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
-Yerel çıkarım tamamlandı (181 segment, 276 aday). 12 onay `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı ayrı ayrı doğrulandı. 30 adaylık denetim listesi `.assets/iddia-kesinlik-orneklemi.txt` dosyasında. Etiketler gelince Wilson aralığını hesapla.
+Üçüncü aşama tamamlandı. 181 segmentten 276 aday çıktı. Egemen'in 12 onayı `speech-2026-11-27-a021d36033` kaydıyla aktarıldı ve yayın günü sınırı doğrulandı. Kullanıcının talimatı gereği dördüncü aşama beklemede.
+
+Kodla seçilen 30 adaylık örneklem (tohum 42) Codex tarafından alıntı, çevre metni, konu ve iddia alanları üzerinden denetlendi. 2 doğru, 19 kısmen doğru, 9 yanlış. Katı kesinlik %6,7 (Wilson %95 GA %1,8–21,3), geniş kesinlik %70,0 (GA %52,1–83,3). Kısmi eşleşmelerde yön, metrik ve bağlam eksikleri görüldü. Yanlışlar arasında muhabir sorularının iddia sayılması ve şirket ifadesinin sektöre genellenmesi var. Denetim etiketleri `.assets/iddia-kesinlik-denetimi.json` içinde ve Egemen'in onaylarından ayrı tutuluyor.
 
 Egemen üçüncü aşamaya geçişi onayladı. `bist-analist` ile 181 segmentin çıkarımı arka planda çalışıyor. `DURUM.cmd` işlenen segmentleri ve biriken inceleme adaylarını gösterir. Tamamlanan her segmentin girdisi, model kimliği, şeması ve çıkarım ayarlarıyla eşleşen sonuç, `.assets/speech-extraction.sqlite` dosyasından yeniden kullanılır. Geçersiz model yanıtı yeniden denenebilir kalır.
 

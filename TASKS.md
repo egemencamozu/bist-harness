@@ -24,7 +24,7 @@
 - [x] Finans ve Borsa'nın beş videosunda 50 segmenti ve 54 inceleme adayının kaynak bağlantısını doğrula.
 - [x] Fed ve TCMB dahil 181 segmentin çıkarımını tamamla ve 30 adaylık denetim örneklemini hazırla.
 - [x] İnsan tarafından onaylanan 12 iddiayı dondur, aktar ve yayın tarihi sınırını doğrula.
-- [ ] 30 denetim etiketini al ve kesinliği Wilson aralığıyla ölç.
+- [x] 30 adayın bağlamsal Codex denetimini tamamla ve Wilson aralığını hesapla. Egemen'in 12 onayı ayrı kayıtta.
 
 ## 4. Deterministik doğrulama ve Point-in-Time
 
