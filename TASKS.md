@@ -23,7 +23,7 @@
 - [x] Yerel çıkarımı, birebir kaynak doğrulamasını ve segment bazlı kesintiden devamı doğrula (337 test geçti).
 - [x] Finans ve Borsa'nın beş videosunda 50 segmenti ve 54 inceleme adayının kaynak bağlantısını doğrula.
 - [ ] Fed ve TCMB'nin çıkarımını tamamla, tüm kaynaklar için denetim örneklemini hazırla.
-- [ ] İnsan kararlarını değerlendir, kesinliği ölç ve onaylı kayıtların PIT ingest'ini doğrula.
+- [ ] İnsan kararlarını değerlendir (Finans ve Borsa'da 12 onay, 42 aday bekliyor), kesinliği ölç ve onaylı kayıtların PIT ingest'ini doğrula.
 
 ## 4. Deterministik doğrulama ve Point-in-Time
 

@@ -108,6 +108,12 @@
                                               "updated_at":  "2026-11-26T15:58:21.1470574+00:00",
                                               "fingerprint":  "49df6f01a655cde67403607f09daee678183669dcb3f98d44ee193aaad221a12",
                                               "detail":  "Five FB videos, 50 segments, 54 indexed candidates with verified quotes. Human decision pending."
-                                          }
+                                          },
+                    "speech.review.fb":  {
+                                             "status":  "in_progress",
+                                             "updated_at":  "2026-11-26T16:05:14.9711120+00:00",
+                                             "fingerprint":  "86df4ae1e68bb32d9fcb667da8a9ac9c6e15bbc4f76846361147caad63499fa9",
+                                             "detail":  "Egemen approved 12 indexed FB candidates; 42 are pending. The approval files were read back and verified."
+                                         }
                 }
 }
