@@ -12,11 +12,14 @@
 
 ## 2. Transkript ve ingest
 
-- [ ] Aşama geçiş onayıyla sabit listedeki beş FB transkriptini ve mevcutsa TCMB/Fed altyazı ve resmî metinlerini rehbere göre hazırla. Donmuş ingest ve etiketleri doğrula.
+- [x] Egemen'in ikinci aşama onayını al ve sabit video listesini yerel girdilerle karşılaştır.
+- [x] Beş Finans ve Borsa videosunun zaman damgalı transkriptlerini hazırla ve ayrıştırmayı doğrula.
+- [x] TCMB ve Fed altyazılarını ve resmî referans metinlerini hazırla.
+- [x] Doğrulanan girdilerle donmuş snapshot oluştur, ingest ve etiketleri test et (7 video, 181 segment, 334 test geçti).
 
 ## 3. İddia çıkarma ve insan incelemesi
 
-- [ ] Segment bazlı yerel iddia çıkarma, kaynak doğrulaması, kesintiden devam, insan incelemesi ve PIT iddia okuması. Test ve kesinlik denetimi.
+- [ ] Aşama geçiş onayıyla segment bazlı yerel iddia çıkarma, kaynak doğrulaması, kesintiden devam, insan incelemesi ve PIT iddia okuması. Test ve kesinlik denetimi.
 
 ## 4. Deterministik doğrulama ve Point-in-Time
 

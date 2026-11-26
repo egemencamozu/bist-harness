@@ -14,9 +14,15 @@ Ollama 0.40.17 kuruldu. Ağ kesintileri sonrası devam eden üç parçalı GGUF 
 
 Yerel Harness V07 uçtan uca testi 273,7 saniyede geçti. Hafta örüntüsü doğru tanındı, model dört araç çağrısı planladı, geçersiz çağrı görülmedi ve açıklama ilk denetimden geçti. Koşu sırasında Ollama CPU/GPU dağılımını %58/%42 olarak gösterdi. Test komutu `.venv\Scripts\python.exe -m eval.robustness --set v2 --e2e --only V07 --models bist-analist --intent llm --out .assets/baseline-smoke`. Yerel sonuç `.assets/baseline-smoke/v2/e2e_bist-analist.json` dosyasında.
 
+Egemen ikinci aşamaya geçişi onayladı. Sabit listedeki yedi videonun YouTube transkript panelindeki zaman damgalı metinleri kaydedildi. TCMB konuşma metni ve Fed basın toplantısı transkripti referans olarak eklendi. Listedeki iki resmî videonun URL'si doğrulandı.
+
+`speech-2026-11-26-45f5eb9c38` ingest kaydı yedi kaynaktan 181 segment içeriyor. SHA-256 manifesti 10 girdiyle doğrulandı. TCMB altyazısı için WER %4,5, Fed altyazısı için %1,6. Beş Finans ve Borsa videosunda mevcut kalite kuralı TCMB ölçümünü vekil olarak kullanır. Gerçek veride yedi video için yayın tarihinden önceki gün boş sonuç verdi, yayın gününde segmentler erişilebildi. Bilanço videosunun THYAO etiketi doğrulandı. Aynı videodaki kısaltılmış Coca-Cola adı mevcut CCOLA sözlüğüne uymadığı için etiketlenmedi.
+
+Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konumunda. Ingest sonrası veri bütünlüğü ve diğer tabloların içeriği yedeğe karşı denetlendi. Ruff lint ve biçim kontrolleri ile mypy geçti. İlk pytest koşusundaki Windows geçici klasörü erişim sorunu, proje içinde ayrı bir `--basetemp` kullanılarak giderildi. Tam koşuda 334 test geçti.
+
 ## Sonraki adım
 
-Kurulum ve başlangıç doğrulaması tamamlandı. `CLAUDE.md` §12 uyarınca Egemen'in aşama geçiş onayıyla sabit listedeki videoların transkript hazırlığına ve ingest'e geç.
+İkinci aşama tamamlandı. `CLAUDE.md` §12 uyarınca Egemen'in geçiş onayını kaydet, ardından yerel iddia çıkarma ve insan incelemesine başla.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. JSON doğrulaması başarısız olursa `git show HEAD:CHECKPOINT.json` ile son yerel Git kaydını oku ve dosya sağlama toplamlarını yeniden kontrol et. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
 

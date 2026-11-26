@@ -84,6 +84,12 @@
                                      "updated_at":  "2026-11-26T14:41:28.9913085+00:00",
                                      "fingerprint":  "a164303889b633c33a170388e4fa62dbb2bb5c5a161045c6e66a8ed9cec72de7",
                                      "detail":  "Static checks, Release integrity, local registration and end-to-end Harness smoke test passed."
-                                 }
+                                 },
+                    "speech.ingest":  {
+                                          "status":  "completed",
+                                          "updated_at":  "2026-11-26T14:52:44.3508148+00:00",
+                                          "fingerprint":  "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
+                                          "detail":  "speech-2026-11-26-45f5eb9c38: seven videos, 181 segments, 10 manifest inputs, publication-date checks and all 334 tests passed."
+                                      }
                 }
 }
