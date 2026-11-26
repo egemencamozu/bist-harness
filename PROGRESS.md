@@ -22,6 +22,8 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
+Konuşma çıkarımındaki kalite açığı için önerilen çalışma, kaynak alıntısının çevresindeki altyazı satırlarını modele bağlam olarak vermek ve metrik, yön, dönem alanlarını kaynaktan doğrulanabildikleri ölçüde doldurmak. Önce mevcut 30 adayda hata türleri, ardından ayrı bir örneklemde doğruluk ve kapsama birlikte ölçülecek. Bu iyileştirme henüz uygulanmadı.
+
 Dördüncü ve beşinci aşamalar tamamlandı. Egemen beşinci aşamaya geçişi sohbetten onayladı. Harness, ilgili senaryolarda haber ve konuşma bağlamını hisse bazında toplar. İnsan onaylı şirket eşlemesi, otomatik etiketin eksik olduğu segmenti de kapsar. `get_speech_features` 1.2.0 yalnızca deterministik olarak ölçülen gözlemleri konuşma kanıtına ekler.
 
 MCP stdio üzerinden 15 araç ve ENKAI'nin yayın öncesi/sonrası görünürlüğü doğrulandı. Gerçek veride S4 şablon Harness koşusu ENKAI video iddiasını E2 kanıtıyla açıkladı ve %55,6643 gözlemini kullandı. 344 test, Ruff lint/format ve mypy geçti. Altıncı aşama değerlendirme ve rapor için geçiş onayı bekliyor.
