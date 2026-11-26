@@ -1,0 +1,50 @@
+{
+    "schema_version":  1,
+    "branch":  "feature/speech-layer",
+    "baseline_commit":  "1f1d00f6997b0b880219809f162b9c6a8cf4836b",
+    "entries":  {
+                    "discovery":  {
+                                      "status":  "completed",
+                                      "detail":  "Repository, hardware, documentation and relevant implementation reviewed."
+                                  },
+                    "baseline":  {
+                                     "status":  "pending"
+                                 },
+                    "checkpoint":  {
+                                       "status":  "completed",
+                                       "updated_at":  "2026-11-26T13:00:13.3649742+00:00",
+                                       "fingerprint":  "01ef3102a83341eea16f2280a9f3fd94fde8da58cd400e498e0843bdfeed231f",
+                                       "detail":  "Atomic replacement, exclusive writer, orphan handling and fingerprint update verified."
+                                   },
+                    "ollama.runtime":  {
+                                           "status":  "in_progress",
+                                           "updated_at":  "2026-11-26T13:01:35.8047353+00:00",
+                                           "fingerprint":  "3dd80f6e3a9699f2eadf4ac418f00529cee594df9557541806eda1f1f3f5588a",
+                                           "detail":  "Resumable official Ollama Windows archive."
+                                       },
+                    "download.sha256sums.txt":  {
+                                                    "status":  "completed",
+                                                    "updated_at":  "2026-11-26T13:02:04.5949425+00:00",
+                                                    "fingerprint":  "109ae082f9aa81480a8dd7a0de23a2002cc5b1486c44c3289d12acdfc9525936",
+                                                    "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
+                                                },
+                    "download.bist.sqlite.gz":  {
+                                                    "status":  "completed",
+                                                    "updated_at":  "2026-11-26T13:02:04.6829419+00:00",
+                                                    "fingerprint":  "79ea6b72539712a68f6065582366b8017d3a86187d250c6983836cb7f2ff623c",
+                                                    "detail":  "SHA-256 verified against GitHub Release assets-2026-11-20."
+                                                },
+                    "install.bist.sqlite":  {
+                                                "status":  "completed",
+                                                "updated_at":  "2026-11-26T13:02:05.5569457+00:00",
+                                                "fingerprint":  "78569c236e376428b017eb4cf571a2040c4971c115282a1e799839df9d1501d1",
+                                                "detail":  "Installed SHA-256 verified against assets-2026-11-20."
+                                            },
+                    "download.bist-4b-q8_0.gguf.part0":  {
+                                                             "status":  "in_progress",
+                                                             "updated_at":  "2026-11-26T13:02:05.6819402+00:00",
+                                                             "fingerprint":  "69db0bc816a532a96b9edf8661d6a49f3e0e0403288dc784ba6976e5369202f4",
+                                                             "detail":  "assets-2026-11-20"
+                                                         }
+                }
+}
