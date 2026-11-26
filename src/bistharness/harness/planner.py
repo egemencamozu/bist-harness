@@ -135,7 +135,10 @@ class ScenarioPlanner:
                 args["ticker_for_corr"] = tk[0]
             return [("get_macro_context", args)]
         if state is S.LOAD_NEWS_AND_SPEECH_CONTEXT:
-            return [("get_news_events", {**_recent(req), "ticker_or_topic": t}) for t in tk]
+            news = [("get_news_events", {**_recent(req), "ticker_or_topic": t}) for t in tk]
+            if sc is Scenario.SAFETY_ADVICE_REQUEST:
+                return news
+            return news + [("get_speech_features", {**_base(req), "source_id_or_topic": t}) for t in tk]
         if state is S.PREVIEW_STRATEGIES:
             return [("run_backtest", self._backtest(req, "ALL", final=False))]
         if state is S.RUN_BACKTEST:

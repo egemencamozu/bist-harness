@@ -14,6 +14,7 @@ import pandas as pd
 from pydantic import Field
 
 from bistharness.analytics import macro_stats
+from bistharness.analytics.claims import Verdict
 from bistharness.core import formatting as fmt
 from bistharness.core.enums import Severity, ToolStatus, WarningCode
 from bistharness.tools import common
@@ -352,7 +353,7 @@ class SpeechInput(ToolInput):
 
 @tool(
     "get_speech_features",
-    version="1.1.0",
+    version="1.2.0",
     input_model=SpeechInput,
     sources=("speech", "fundamentals", "macro", "prices"),
     description="Timestamped transcript segments of selected public finance videos (URL, channel, segment range, "
@@ -363,7 +364,13 @@ def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
     if not key:
         raise ToolInputError("source_id_or_topic is required")
     by_source = ctx.repo.speech_segments(as_of=inp.as_of_date, source_id=key).data
-    df = by_source if not by_source.empty else ctx.repo.speech_segments(as_of=inp.as_of_date, topic=key).data
+    df = (
+        by_source
+        if not by_source.empty
+        else ctx.repo.speech_segments(
+            as_of=inp.as_of_date, topic=key, include_claim_subject=key in ctx.universe.instruments
+        ).data
+    )
     if df.empty:
         w = warn(WarningCode.SPEECH_NOT_AVAILABLE, f"no transcribed segment for {key!r} published by {inp.as_of_date}")
         return ToolOutput({"query": key, "segments": [], "claims": []}, [w], status=ToolStatus.INSUFFICIENT_DATA)
@@ -401,4 +408,32 @@ def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
         if (claim["source_id"], claim["segment_start"]) in segment_keys
         and (not by_source.empty or key not in ctx.universe.instruments or claim["subject"] == key)
     ]
+    for index, claim in enumerate(claims):
+        check = claim["verification"]
+        status = check["status"]
+        if status not in {Verdict.SUPPORTED, Verdict.CONTRADICTED}:
+            continue
+        result = "destekliyor" if status == Verdict.SUPPORTED else "desteklemiyor"
+        metric = {
+            "revenue_yoy": "yıllık hasılat değişimi",
+            "TCMB_POLICY_RATE": "TCMB politika faizi",
+            "TUFE_YOY": "yıllık TÜFE",
+            "TUFE_MOM": "aylık TÜFE",
+        }.get(check["provenance"].get("metric"), "işlem penceresi getirisi")
+        ev.append(
+            common.evidence(
+                f"speech_check.{claim['subject']}.{claim['claim_id']}",
+                "{subject} için {d} tarihli video iddiası incelendi. Kayıtlardaki {metric} {observed}. "
+                "Bu sonuç iddiayı {result}.",
+                {
+                    "subject": claim["subject"],
+                    "d": fmt.tr_date(claim["published_at"]),
+                    "metric": metric,
+                    "observed": fmt.pct(check["observed_percent"] / 100, decimals=4),
+                    "result": result,
+                },
+                values={"status": status, "provenance": check["provenance"]},
+                pointer=f"/result/claims/{index}/verification",
+            )
+        )
     return ToolOutput({"query": key, "segments": segs.drop(columns=["text"]), "claims": claims}, warnings, evidence=ev)

@@ -22,7 +22,9 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
-Dördüncü aşama tamamlandı. 343 test, Ruff ve mypy geçti. Beşinci aşama, Harness planlayıcı ve kanıt entegrasyonu için geçiş onayı bekliyor.
+Dördüncü ve beşinci aşamalar tamamlandı. Egemen beşinci aşamaya geçişi sohbetten onayladı. Harness, ilgili senaryolarda haber ve konuşma bağlamını hisse bazında toplar. İnsan onaylı şirket eşlemesi, otomatik etiketin eksik olduğu segmenti de kapsar. `get_speech_features` 1.2.0 yalnızca deterministik olarak ölçülen gözlemleri konuşma kanıtına ekler.
+
+MCP stdio üzerinden 15 araç ve ENKAI'nin yayın öncesi/sonrası görünürlüğü doğrulandı. Gerçek veride S4 şablon Harness koşusu ENKAI video iddiasını E2 kanıtıyla açıkladı ve %55,6643 gözlemini kullandı. 344 test, Ruff lint/format ve mypy geçti. Altıncı aşama değerlendirme ve rapor için geçiş onayı bekliyor.
 
 PITRepository'nin KAP ve makro okumalarına isteğe bağlı İstanbul saati sınırı eklendi. Sınır SQL'de revizyon seçilmeden önce uygulanır ve as_of gün sonunu aşamaz. 46 PIT, doğrulama ve mevcut araç testi, Ruff ve mypy geçti. Bu destek mevcut araç sözleşmelerine eklenmedi.
 

@@ -380,7 +380,20 @@ class PITRepository:
         return PITFrame(data=df, as_of=a, start=s, end=e, warnings=warnings)
 
     # ------------------------------------------------------------------ speech
-    def speech_segments(self, *, as_of: Any, source_id: str | None = None, topic: str | None = None) -> PITFrame:
+    def _has_speech_claims(self) -> bool:
+        return (
+            self._conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'speech_claims'").fetchone()
+            is not None
+        )
+
+    def speech_segments(
+        self,
+        *,
+        as_of: Any,
+        source_id: str | None = None,
+        topic: str | None = None,
+        include_claim_subject: bool = False,
+    ) -> PITFrame:
         """Transcribed video segments published up to as_of (knowledge time = video publication time)."""
         a = require_as_of(as_of)
         bound = as_of_end_of_day(a)
@@ -393,8 +406,15 @@ class PITRepository:
             sql += " AND source_id = ?"
             params.append(source_id)
         if topic:
-            sql += " AND topics LIKE ?"
+            sql += " AND (topics LIKE ?"
             params.append(f'%"{topic}"%')
+            if include_claim_subject and self._has_speech_claims():
+                sql += (
+                    " OR EXISTS (SELECT 1 FROM speech_claims AS c WHERE c.source_id = speech_segments.source_id "
+                    "AND c.segment_start = speech_segments.segment_start AND c.subject = ? AND c.published_at <= ?)"
+                )
+                params.extend((topic, bound))
+            sql += ")"
         df = self._read(sql + " ORDER BY published_at, source_id, segment_start", params)
         self._post_check(df, "published_at", bound, "speech_segments")
         return PITFrame(data=df, as_of=a, start=None, end=a)
@@ -407,10 +427,7 @@ class PITRepository:
             "claim_id, source_id, segment_start, published_at, subject, claim_type, quote, "
             "quoted_numbers, metric, direction, horizon_days, stance, certainty, review_note"
         )
-        table = self._conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'speech_claims'"
-        ).fetchone()
-        if table is None:
+        if not self._has_speech_claims():
             return PITFrame(data=pd.DataFrame(columns=columns.split(", ")), as_of=a, start=None, end=a)
         sql = f"SELECT {columns} FROM speech_claims WHERE published_at <= ?"
         params: list[Any] = [bound]

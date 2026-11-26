@@ -90,6 +90,7 @@ evidence:
     - "sector.*.{t}.lag.w*"
     - "sector.*.catch_up.h*"
     - "sector.*.{t}.persistent_lag"
+    - "speech_check.{t}.*"
     - "fundamental_change.{t}.*.ebitda_margin"
     - "fundamental_change.{t}.*.net_margin"
     - "fundamental_change.{t}.excluded.*"
@@ -112,6 +113,7 @@ evidence:
     - "reversal.{t}.BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD.h*"
     - "reversal.{t}.combo_comparison"
     - "reversal.{t}.active_now"
+    - "speech_check.{t}.*"
     - "reversal.{t}.excluded_incomplete"
     - "indicators.{t}.trend_state"
     - "support_resistance.{t}.nearest_support"
@@ -119,6 +121,7 @@ evidence:
     - "backtest.A_TECH.out_of_sample"
   S4_FUNDAMENTAL_REACTION:
     - "fundamentals.{t}.latest_report"
+    - "speech_check.{t}.*"
     - "fundamentals.{t}.*.yoy_ytd"
     - "fundamental_change.{t}.*.ebitda_margin"
     - "fundamental_change.{t}.*.net_debt_to_ebitda"

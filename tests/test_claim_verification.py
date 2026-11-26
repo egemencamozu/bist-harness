@@ -78,13 +78,15 @@ def test_speech_tool_keeps_quotes_out_of_evidence_and_ignores_later_releases(mem
     )
     mem_conn.execute(
         "INSERT INTO macro_observations VALUES (?,?,?,?,?,?,?)",
-        ("TUFE_YOY", "2026-08-01", 40.0, "2026-09-03 10:00:00", "fixture", None, "fixture"),
+        ("TUFE_YOY", "2026-08-01", 40.2, "2026-09-03 10:00:00", "fixture", None, "fixture"),
     )
     ctx = ToolContext(PITRepository(mem_conn), load_settings(), load_universe())
     inp = {"source_id_or_topic": "sample", "as_of_date": "2026-10-06"}
     before = run_tool("get_speech_features", inp, ctx)
     assert before.result["claims"][0]["verification"]["status"] == Verdict.SUPPORTED
-    assert all("40" not in value for item in before.evidence_candidates for value in item.display.values())
+    check = next(item for item in before.evidence_candidates if item.key.startswith("speech_check."))
+    assert check.display["observed"] == "%40,2000" and quote not in check.claim_tr
+    assert "%40,0000" not in check.display.values()
     mem_conn.execute(
         "INSERT INTO macro_observations VALUES (?,?,?,?,?,?,?)",
         ("TUFE_YOY", "2026-08-01", 999.0, "2026-10-05 09:00:01", "fixture", None, "fixture"),
@@ -113,3 +115,39 @@ def test_price_forecast_uses_known_close_and_requires_explicit_sessions(mem_conn
     assert (
         verify_claim(ctx, {**claim, "quote": "2 gün içinde yükselecek."}, tuesday)["status"] == Verdict.NOT_VERIFIABLE
     )
+
+
+def test_approved_subject_can_supply_a_segment_missing_its_ticker_tag(mem_conn: sqlite3.Connection) -> None:
+    pub = "2026-03-05 19:31:24"
+    quote = "Hasılat yıllık bazda yüzde 20 arttı."
+    mem_conn.execute(
+        "INSERT INTO speech_segments VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("sample", 0, 60, pub, "", "A", "B", quote, "[]", None, 1.0, "fixture"),
+    )
+    mem_conn.execute(
+        "INSERT INTO speech_claims VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "claim",
+            "sample",
+            0,
+            pub,
+            "seg",
+            "extract",
+            "ENKAI",
+            "fundamental_value",
+            quote,
+            '[["pct",20.0]]',
+            "revenue_growth",
+            "up",
+            None,
+            "neutral",
+            "high",
+            "",
+            "fixture",
+        ),
+    )
+    ctx = ToolContext(PITRepository(mem_conn), load_settings(), load_universe())
+    inp = {"source_id_or_topic": "ENKAI", "as_of_date": "2026-03-05"}
+    result = run_tool("get_speech_features", inp, ctx).result
+    assert len(result["segments"]) == 1 and result["claims"][0]["claim_id"] == "claim"
+    assert run_tool("get_speech_features", {**inp, "as_of_date": "2026-03-04"}, ctx).result["claims"] == []

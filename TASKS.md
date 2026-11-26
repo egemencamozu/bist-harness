@@ -35,10 +35,10 @@
 
 - [x] Egemen'in onayladığı yöntemle deterministik doğrulama ve `get_speech_features` 1.1.0 çıktısını tamamla. 12 gerçek iddia doğrulama hattından geçti, 343 test başarılı.
 
-## 5. MCP ve Harness entegrasyonu (aşama onayı bekliyor)
+## 5. MCP ve Harness entegrasyonu
 
-- [ ] MCP, Harness ve kanıt entegrasyonu. En az bir uçtan uca çalışma.
+- [x] MCP, Harness ve kanıt entegrasyonu. ENKAI ile stdio ve uçtan uca şablon koşusu, 344 test başarılı.
 
-## 6. Nihai testler, değerlendirme ve rapor
+## 6. Nihai testler, değerlendirme ve rapor (aşama onayı bekliyor)
 
 - [ ] WER, Wilson güven aralığı, sonuç dağılımı ve sunum örneklerini `reports/speech_claims.md` içinde raporla. Final kontrolleri ve CLAUDE §14 kaydı.

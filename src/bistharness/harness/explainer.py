@@ -168,7 +168,12 @@ class TemplateExplainer:
         # facts the decision relies on come first, then the others (a variant uses 4-6 of them)
         k = 4 + v % 3
         cited_first = [c for c in facts if c["id"] in d.cite]
-        used = (cited_first + [c for c in facts if c["id"] not in d.cite])[:k]
+        ordered = cited_first + [c for c in facts if c["id"] not in d.cite]
+        if any(word in req.question.casefold() for word in ("video", "konuşma", "transkript")):
+            speech = next((c for c in ordered if c["key"].startswith("speech_check.")), None)
+            if speech is not None:
+                ordered = [speech, *(c for c in ordered if c["id"] != speech["id"])]
+        used = ordered[:k]
         used.sort(key=lambda c: int(c["id"][1:]))
         opener = OPENERS[v % len(OPENERS)]
         body = " ".join(f"{c['claim_tr'].rstrip('.')} ({c['id']})." for c in used)
