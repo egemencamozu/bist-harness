@@ -1,5 +1,7 @@
 # Son çalışma durumu
 
+`DURUM.cmd` açıkken görevleri ve diskteki indirme baytlarını 10 saniyede bir yeniler. İndirme tahmini gözlenen hıza göre değişir. Aşama ve görev durumları `TASKS.md` içindeki işaretlerden gelir.
+
 ## 26 Kasım 2026
 
 Uzak dal ve `1f1d00f6997b0b880219809f162b9c6a8cf4836b` başlangıç sürümü doğrulandı. Çalışma klasörü ilk kontrolde boştu. Rehberler ve konuşma katmanının uygulama noktaları incelendi. Release listesi doğrulandı.
