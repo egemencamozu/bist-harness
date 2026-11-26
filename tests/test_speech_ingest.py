@@ -131,3 +131,54 @@ def test_video_list_is_fixed_and_well_formed() -> None:
     assert len(videos) == 7 and all(v.published_at < "2026-09-10" for v in videos)  # before the golden as_of
     ids = {v.source_id for v in videos}
     assert all(v.quality_from in ids | {"self"} for v in videos)
+
+
+def test_approved_claims_only_and_frozen_publication_time(tmp_path: Path) -> None:
+    from bistharness.core.speech_claims import ClaimProposal, ClaimSegment, ReviewRecord
+
+    s = _project(tmp_path, VIDEOS, FILES)
+    speech.run(s, "2026-11-20", tagger=TAGGER)
+    repo = PITRepository(s.db_path)
+    row = repo.speech_segments(as_of="2026-03-01", source_id="v_off").data.iloc[0]
+    segment = ClaimSegment.from_values(
+        row.source_id, row.segment_start, row.segment_end, row.published_at, row.text, row.topics
+    )
+    proposal = ClaimProposal(
+        subject="MACRO",
+        claim_type="macro_value",
+        quote=segment.text,
+        metric="policy_rate",
+        direction="none",
+        horizon_days=None,
+        stance="neutral",
+        certainty="high",
+    )
+    approved = ReviewRecord(
+        claim_id="",
+        source_id=segment.source_id,
+        segment_start=segment.start,
+        segment_sha256=segment.digest,
+        extraction_sha256="a" * 64,
+        claim=proposal,
+        reviewed=True,
+    )
+    approved.claim_id = approved.expected_id
+    rejected = approved.model_copy(
+        update={"claim": proposal.model_copy(update={"certainty": "low"}), "reviewed": False}
+    )
+    rejected.claim_id = rejected.expected_id
+    folder = s.path("manual") / "claims"
+    folder.mkdir()
+    path = folder / "v_off.jsonl"
+    path.write_text(approved.model_dump_json() + "\n" + rejected.model_dump_json(), encoding="utf-8")
+    assert speech.run(s, "2026-11-21", tagger=TAGGER, include_reviews=True).claims == 1
+    assert repo.speech_claims(as_of="2026-02-28").data.empty
+    claims = repo.speech_claims(as_of="2026-03-01", source_id="v_off").data
+    assert list(claims["claim_id"]) == [approved.claim_id]
+    assert json.loads(claims.iloc[0].quoted_numbers) == [["pct", 40.0]]
+    speech.run(s, "2026-11-20", tagger=TAGGER)
+    assert len(repo.speech_claims(as_of="2026-03-01").data) == 1
+    path.write_text(approved.model_copy(update={"segment_sha256": "stale"}).model_dump_json(), encoding="utf-8")
+    with pytest.raises(SnapshotIntegrityError, match="Stale"):
+        speech.run(s, "2026-11-22", tagger=TAGGER, include_reviews=True)
+    assert len(repo.speech_claims(as_of="2026-03-01").data) == 1

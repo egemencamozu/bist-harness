@@ -22,7 +22,15 @@ Ingest öncesi SQLite yedeği `.assets/pre-speech-ingest-2026-11-26.sqlite` konu
 
 ## Sonraki adım
 
-İkinci aşama tamamlandı. `CLAUDE.md` §12 uyarınca Egemen'in geçiş onayını kaydet, ardından yerel iddia çıkarma ve insan incelemesine başla.
+Egemen üçüncü aşamaya geçişi onayladı. `bist-analist` ile 181 segmentin çıkarımı arka planda çalışıyor. `DURUM.cmd` işlenen segmentleri ve biriken inceleme adaylarını gösterir. Tamamlanan her segmentin girdisi, model kimliği, şeması ve çıkarım ayarlarıyla eşleşen sonuç, `.assets/speech-extraction.sqlite` dosyasından yeniden kullanılır. Geçersiz model yanıtı yeniden denenebilir kalır.
+
+İlk denemede modelin serbest yazdığı konu adları ve alıntılar gereksiz retlere yol açtı. Üretim koşusunda model aday listesinden konuyu ve numaralı kaynak pasajını seçiyor. Kod alıntıyı doğrudan segmentten alır. İlk gerçek adayın kaynak içeriği ve kimliği doğrulandı, insan kararı bekliyor.
+
+337 test, Ruff lint ve format ile mypy geçti. Testlerde bozulan çıkarımın tekrar denenebilmesi, değişen girdinin önbelleği geçersiz kılması, insan kararının korunması ve yalnız onaylı iddianın video yayın tarihi itibarıyla PIT okumasına girmesi denetlendi.
+
+Çıkarımı sürdürmek için etkin bir kopya olmadığını doğrula ve `.venv\Scripts\python.exe -m bistharness.harness.claims --as-of 2026-11-26` çalıştır. Arka plan günlüğü `.assets/speech-extraction.stderr.log` dosyasında. Kaynak alıntıları ve kararlar `data/manual/claims/<source_id>.jsonl` içinde yerelde kalır.
+
+Tam koşu tamamlandıktan sonra insan incelemesinde yalnız `reviewed` (onay için `true`, ret için `false`, bekleyen için `null`), `review_note` ve örneklemde `audit` alanlarını düzenle. Örneklemi `.venv\Scripts\python.exe -m eval.speech_review_audit --list` ile listele. Örnek kayıtları `correct`, `partial` veya `incorrect` olarak değerlendir ve kesinlik ile Wilson aralığını aynı komutla ölç. Ardından onaylı dosyaları yeni bir snapshot adıyla `speech --include-reviews` yolundan ingest et ve PIT çıktısını doğrula. Finansal iddia doğrulaması dördüncü aşamanın ayrı onayını bekler.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File setup\checkpoint.ps1` son güvenli kaydı gösterir. JSON doğrulaması başarısız olursa `git show HEAD:CHECKPOINT.json` ile son yerel Git kaydını oku ve dosya sağlama toplamlarını yeniden kontrol et. `powershell -NoProfile -ExecutionPolicy Bypass -File setup\resume_assets.ps1` Release DB ve modeli doğrular veya yarım indirmeye devam eder. `-SkipModel` ile yalnız DB hazırlanır. Kesinti sonrası etkin bir indirme varsa aynı işlemi ikinci kez başlatmadan önce durumu kontrol et.
 

@@ -90,6 +90,18 @@
                                           "updated_at":  "2026-11-26T14:52:44.3508148+00:00",
                                           "fingerprint":  "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
                                           "detail":  "speech-2026-11-26-45f5eb9c38: seven videos, 181 segments, 10 manifest inputs, publication-date checks and all 334 tests passed."
-                                      }
+                                      },
+                    "speech.extract":  {
+                                           "status":  "in_progress",
+                                           "updated_at":  "2026-11-26T15:14:10.4851182+00:00",
+                                           "fingerprint":  "28cdc860f463eccbd8d0f7e9cd39b7d2effbe1b7f9d5615497d579571806a21f",
+                                           "detail":  "Phase 3 approved by Egemen; implementing and testing grounded extraction and human approval."
+                                       },
+                    "speech.extract.pipeline":  {
+                                                    "status":  "completed",
+                                                    "updated_at":  "2026-11-26T15:20:48.5135117+00:00",
+                                                    "fingerprint":  "997c153e447bf82f87829785c71b8ed13e612bd917d275a5c7809bdb6d394721",
+                                                    "detail":  "337 tests passed; verified a live local proposal against its source segment. Full extraction and human review pending."
+                                                }
                 }
 }

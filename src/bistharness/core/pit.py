@@ -389,3 +389,25 @@ class PITRepository:
         df = self._read(sql + " ORDER BY published_at, source_id, segment_start", params)
         self._post_check(df, "published_at", bound, "speech_segments")
         return PITFrame(data=df, as_of=a, start=None, end=a)
+
+    def speech_claims(self, *, as_of: Any, source_id: str | None = None) -> PITFrame:
+        """Return human-approved records using the source video's publication date."""
+        a = require_as_of(as_of)
+        bound = as_of_end_of_day(a)
+        columns = (
+            "claim_id, source_id, segment_start, published_at, subject, claim_type, quote, "
+            "quoted_numbers, metric, direction, horizon_days, stance, certainty, review_note"
+        )
+        table = self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'speech_claims'"
+        ).fetchone()
+        if table is None:
+            return PITFrame(data=pd.DataFrame(columns=columns.split(", ")), as_of=a, start=None, end=a)
+        sql = f"SELECT {columns} FROM speech_claims WHERE published_at <= ?"
+        params: list[Any] = [bound]
+        if source_id is not None:
+            sql += " AND source_id = ?"
+            params.append(source_id)
+        data = self._read(sql + " ORDER BY published_at, source_id, segment_start, claim_id", params)
+        self._post_check(data, "published_at", bound, "speech_claims")
+        return PITFrame(data=data, as_of=a, start=None, end=a)

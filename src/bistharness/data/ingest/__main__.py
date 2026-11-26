@@ -32,6 +32,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     n.add_argument("--snapshot", required=True, help="snapshot name = first day NOT included (YYYY-MM-DD)")
     sp = sub.add_parser("speech", help="freeze data/manual/videos.csv + pasted transcripts, rebuild speech_segments")
     sp.add_argument("--snapshot", required=True, help="snapshot name = first day NOT included (YYYY-MM-DD)")
+    sp.add_argument("--include-reviews", action="store_true", help="freeze and import approved speech claims")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -80,9 +81,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.cmd == "speech":
         from bistharness.data.ingest import speech
 
-        sr = speech.run(load_settings(), args.snapshot)
+        sr = speech.run(load_settings(), args.snapshot, include_reviews=args.include_reviews)
         print(f"ingest_id     : {sr.ingest_id}")
         print(f"segments      : {sr.segments}")
+        if args.include_reviews:
+            print(f"claims        : {sr.claims}")
         for v in sr.videos:
             q = "-" if v.quality is None else f"{v.quality:.1%}"
             wer = "" if v.wer is None else f"  (WER {v.wer:.1%} vs official text)"

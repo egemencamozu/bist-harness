@@ -39,9 +39,11 @@ from bistharness import __version__
 from bistharness.core.config import Settings
 from bistharness.core.errors import DataNotFoundError, SnapshotIntegrityError
 from bistharness.core.hashing import file_sha256, sha256_hex
+from bistharness.core.speech_claims import ClaimSegment
 from bistharness.data import db
 from bistharness.data.ingest import manifest as mf
 from bistharness.data.ingest.news import TAGS_FILE, Tagger, tr_lower
+from bistharness.data.ingest.speech_reviews import approved_rows
 
 log = logging.getLogger(__name__)
 
@@ -212,7 +214,7 @@ def read_videos(path: Path) -> list[Video]:
     return out
 
 
-def _inputs(manual: Path) -> dict[str, Path]:
+def _inputs(manual: Path, include_reviews: bool = False) -> dict[str, Path]:
     """Published-path -> source file for everything the speech snapshot freezes (non-empty transcripts only)."""
     out = {VIDEOS_FILE: manual / VIDEOS_FILE}
     tdir = manual / TRANSCRIPT_DIR
@@ -220,17 +222,19 @@ def _inputs(manual: Path) -> dict[str, Path]:
         for p in sorted(tdir.glob("*.txt")):
             if p.read_text(encoding="utf-8").strip():
                 out[f"{TRANSCRIPT_DIR}/{p.name}"] = p
+    if include_reviews:
+        out.update({f"claims/{p.name}": p for p in sorted((manual / "claims").glob("*.jsonl")) if p.is_file()})
     return out
 
 
-def prepare_speech_snapshot(settings: Settings, snapshot: str) -> dict[str, object]:
+def prepare_speech_snapshot(settings: Settings, snapshot: str, *, include_reviews: bool = False) -> dict[str, object]:
     """Copies videos.csv + the non-empty transcripts into data/raw/speech/<snapshot>/ with a sha256 manifest.
     An existing snapshot is verified AND compared with the current inputs: a transcript added or edited after
     freezing needs a new snapshot name (results are never silently computed from different text)."""
     manual = settings.path("manual")
     if not (manual / VIDEOS_FILE).exists():
         raise DataNotFoundError(f"video list not found: {manual / VIDEOS_FILE}")
-    inputs = _inputs(manual)
+    inputs = _inputs(manual, include_reviews)
     dest = settings.raw_dir / SPEECH_SOURCE / snapshot
     if (dest / mf.MANIFEST_NAME).exists():
         m = mf.verify_manifest(dest)
@@ -264,6 +268,7 @@ class VideoReport:
 class SpeechSummary:
     ingest_id: str
     videos: list[VideoReport]
+    claims: int = 0
 
     @property
     def segments(self) -> int:
@@ -326,19 +331,39 @@ def build_segments(
     return rows, list(reports.values())
 
 
-def run(settings: Settings, snapshot: str, tagger: Tagger | None = None) -> SpeechSummary:
+def run(
+    settings: Settings, snapshot: str, tagger: Tagger | None = None, *, include_reviews: bool = False
+) -> SpeechSummary:
     datetime.strptime(snapshot, "%Y-%m-%d")  # snapshot = first day NOT included -> must be a date
     started = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    manifest = prepare_speech_snapshot(settings, snapshot)
+    manifest = prepare_speech_snapshot(settings, snapshot, include_reviews=include_reviews)
     snap = settings.raw_dir / SPEECH_SOURCE / snapshot
     tags_path = settings.root / TAGS_FILE
     tagger = tagger or Tagger.load(tags_path)
     rows, reports = build_segments(snap, read_videos(snap / VIDEOS_FILE), tagger, f"{snapshot} 00:00:00")
     version = sha256_hex([manifest["content_sha256"], file_sha256(tags_path) if tags_path.exists() else ""])
     ingest_id = f"speech-{snapshot}-{version[:10]}"
+    by_segment = {
+        (str(r[0]), float(str(r[1]))): ClaimSegment.from_values(
+            str(r[0]), float(str(r[1])), float(str(r[2])), str(r[3]), str(r[7]), str(r[8])
+        )
+        for r in rows
+    }
+    reviews = approved_rows(snap / "claims", by_segment, ingest_id) if include_reviews else []
     conn = db.connect(settings.db_path)
     try:
         db.init_db(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        if include_reviews:
+            conn.execute("DELETE FROM speech_claims")
+            conn.executemany("INSERT INTO speech_claims VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", reviews)
+        else:
+            hashes = {key: seg.digest for key, seg in by_segment.items()}
+            stale = conn.execute("SELECT claim_id, source_id, segment_start, segment_sha256 FROM speech_claims")
+            conn.executemany(
+                "DELETE FROM speech_claims WHERE claim_id = ?",
+                [(cid,) for cid, src, start, digest in stale if hashes.get((src, start)) != digest],
+            )
         conn.execute("DELETE FROM speech_segments")
         conn.executemany(
             "INSERT INTO speech_segments (source_id, segment_start, segment_end, published_at, url, speaker, channel, "
@@ -362,7 +387,7 @@ def run(settings: Settings, snapshot: str, tagger: Tagger | None = None) -> Spee
         conn.commit()
     finally:
         conn.close()
-    return SpeechSummary(ingest_id, reports)
+    return SpeechSummary(ingest_id, reports, len(reviews))
 
 
 __all__ = [

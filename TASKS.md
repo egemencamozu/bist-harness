@@ -19,7 +19,10 @@
 
 ## 3. İddia çıkarma ve insan incelemesi
 
-- [ ] Aşama geçiş onayıyla segment bazlı yerel iddia çıkarma, kaynak doğrulaması, kesintiden devam, insan incelemesi ve PIT iddia okuması. Test ve kesinlik denetimi.
+- [x] Egemen'in üçüncü aşama geçiş onayını al.
+- [x] Yerel çıkarımı, birebir kaynak doğrulamasını ve segment bazlı kesintiden devamı doğrula (337 test geçti).
+- [ ] Yedi kaynağın tamamı için insan inceleme dosyalarını hazırla.
+- [ ] İnsan kararlarını değerlendir, kesinliği ölç ve onaylı kayıtların PIT ingest'ini doğrula.
 
 ## 4. Deterministik doğrulama ve Point-in-Time
 

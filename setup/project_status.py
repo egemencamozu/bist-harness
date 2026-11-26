@@ -76,6 +76,17 @@ def render(root: Path, previous: dict[str, tuple[float, int]]) -> str:
         if name == current:
             lines.extend(f"  - {task}" for done, task in tasks if not done)
 
+    extraction = root / ".assets" / "speech-extraction.json"
+    if extraction.is_file():
+        speech = json.loads(extraction.read_text(encoding="utf-8"))
+        lines.extend(
+            (
+                "",
+                f"İddia çıkarımı · {speech['done']}/{speech['total']} segment · {speech['claims']} inceleme adayı",
+                f"  Son kayıt: {speech['source']} · yeniden denenebilir: {speech['failed']}",
+            )
+        )
+
     lines.extend(("", "İndirmeler"))
     now = time.monotonic()
     for label, operation, files in DOWNLOADS:
