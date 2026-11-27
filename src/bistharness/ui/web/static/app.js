@@ -557,7 +557,7 @@ function backtestBlock(res) {
     <div class="figs">
       ${fig("Kümülatif getiri", pct(m.cumulative, 1, true), sign(m.cumulative), "nominal")}
       ${fig("Reel getiri", pct(v.real_cumulative, 1, true), sign(v.real_cumulative), "TÜFE'ye göre")}
-      ${fig("XU100 farkı", pct(v.vs_xu100, 1, true), sign(v.vs_xu100), "aynı dönem")}
+      ${fig("XU100 farkı", `${v.vs_xu100 > 0 ? "+" : ""}${trNum((v.vs_xu100 ?? 0) * 100, 1)} puan`, sign(v.vs_xu100), "kümülatif getiri farkı")}
       ${fig("En büyük düşüş", pct(m.max_drawdown, 1), "neg", "tepe–dip")}
       ${fig("Sharpe", trNum(m.sharpe_rf0 ?? 0, 2), "", `politika faizine göre ${trNum(m.sharpe_policy ?? 0, 2)}`)}
       ${fig("Kapanan işlem", String(tr.n_closed ?? 0), "", `kazanan oranı ${pct(tr.win_rate, 0)}`)}
