@@ -553,6 +553,12 @@ Verilen kararlar (2026-11-20):
   HOLD → INVESTIGATE (şablonla 5/5 geçiyor), Q2–Q5 birebir aynı. `reports/golden_final.json` ve S1 içeren ablasyon/
   dayanıklılık koşuları bu değişiklikten ÖNCEKİ davranışı yansıtır → final golden LLM ile yeniden koşulmalı.
 
+- **Faz 7 raporları (2026-11-27):** `eval/scenario_reports.py` (docstring tek doğruluk kaynağı) golden soruları harness'tan
+  geçirip `reports/scenarios/` altına S1, S2, S3, S4, makro ve backtest raporlarını + `fig/` grafiklerini üretir; her sayı
+  araç zarfından, ekte call_id ve veri sürümü, koşular `episodic_q*.sqlite` (replay). Kıyas için tüm 30 hisse/sektör
+  taraması aynı snapshot'tan. matplotlib `report` ekstrası. Komut: `uv run --extra report python -m eval.scenario_reports
+  s1 s2 s3 s4 makro backtest`. Getiri FARKLARI "puan" ile yazılır (%. değil).
+
 Açık:
 1. (kapandı) Makro anahtarsız çözüldü — §11.
 2. (kapandı) Video listesi — yukarıda.

@@ -212,7 +212,7 @@ güncel olayın tarihsel ve backtest kanıtıyla desteklenmesi gerekir; bu koşu
 
 ## Ek — kaynak araç çağrıları
 
-Analiz `A-20261127012125750470-a668d0e1` · karar `D-20261127012125750470-a668d0e1` · episodik kayıt `reports/scenarios/episodic_q3.sqlite`.
+Analiz `A-20261127013520270862-a668d0e1` · karar `D-20261127013520270862-a668d0e1` · episodik kayıt `reports/scenarios/episodic_q3.sqlite`.
 
 Veri sürümü (sha256, ilk 12): fundamentals `41b26fc0d037`, macro `7c8f1f74f52e`, news `cfba92ab38d9`, prices `330c06c5e4c9`
 
@@ -226,9 +226,9 @@ Veri sürümü (sha256, ilk 12): fundamentals `41b26fc0d037`, macro `7c8f1f74f52
 | RUN_PATTERN_AND_REVERSAL_ANALYSIS | `detect_reversal_events` | plan | `b6dcaeb9ede50db4` |
 | LOAD_NEWS_AND_SPEECH_CONTEXT | `get_news_events` | plan | `e36418085143d0f9` |
 | LOAD_NEWS_AND_SPEECH_CONTEXT | `get_speech_features` | plan | `a0ee9081824bc781` |
-| BUILD_EVIDENCE | `build_evidence_bundle` | harness | `b97ad3c764c9518a` |
+| BUILD_EVIDENCE | `build_evidence_bundle` | harness | `1c50178ee3994e15` |
 | PREVIEW_STRATEGIES | `run_backtest` | plan | `1488c0c2c4de1609` |
 | RUN_BACKTEST | `run_backtest` | plan | `59a31b59aa84f500` |
-| RUN_BACKTEST | `build_evidence_bundle` | harness | `f475bd172a52705e` |
+| RUN_BACKTEST | `build_evidence_bundle` | harness | `23ab33d855509c1e` |
 | RISK_GATE | `check_data_quality` | harness | `2f7fbc0f29d78ceb` |
-| RISK_GATE | `build_evidence_bundle` | harness | `904d88eecd7d0dfb` |
+| RISK_GATE | `build_evidence_bundle` | harness | `b59921b9ea1244d5` |
