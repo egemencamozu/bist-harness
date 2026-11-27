@@ -1,4 +1,4 @@
-# Harness + Streamlit UI image. Data (data/db) and the model (models/) are mounted, never baked in.
+# Harness + FinTreX Analyst web UI image. Data (data/db) and the model (models/) are mounted, never baked in.
 # Build/run through docker-compose.yml at the project root (README.md).
 FROM python:3.12-slim
 
@@ -19,9 +19,10 @@ RUN uv sync --frozen --no-dev --no-install-project --extra llm --extra ui --extr
 COPY src ./src
 COPY config ./config
 COPY eval ./eval
+# frozen evaluation results shown on the "Nasıl çalışır" page (~14 MB)
+COPY reports ./reports
 RUN uv sync --frozen --no-dev --extra llm --extra ui --extra mcp
 
 EXPOSE 8501
-CMD ["uv", "run", "--no-sync", "streamlit", "run", "src/bistharness/ui/app.py", \
-     "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true", \
-     "--browser.gatherUsageStats=false"]
+CMD ["uv", "run", "--no-sync", "python", "-m", "bistharness.ui.web", \
+     "--host", "0.0.0.0", "--port", "8501", "--no-browser"]

@@ -156,7 +156,7 @@ powershell -ExecutionPolicy Bypass -File setup\get_assets.ps1 -SkipModel  # yaln
 uv run pytest -q                 # hepsi geçmeli (DB varsa ~334 test)
 uv run ruff check . && uv run mypy src
 uv run python -m bistharness.harness run --as-of 2026-09-10 --explainer llm --question "ASELS pazartesi düşerse cuma toparlıyor mu?"
-uv run streamlit run src/bistharness/ui/app.py   # http://localhost:8501
+uv run python -m bistharness.ui.web              # FinTreX Analyst: http://127.0.0.1:8501
 ```
 Harness komutu 17 state'in durumunu, kanıtları, kapıyı ve modelin açıklamasını basar (~30–60 sn).
 
@@ -334,7 +334,7 @@ her biri için unit test ve PIT zehir testi zorunlu.
 - Risk kapısı: düşük transkript kalitesi zaten bir uyarı (`tools/quality.py`).
 - **Not:** bist-analist eğitim verisinde konuşma kanıtı yoktu. Açıklamada bu kanıtları nasıl kullandığını ölç;
   denetçi güvenliği yine sağlar. Gerekirse yeniden eğitim ayrı bir karar konusu.
-- İsteğe bağlı: arayüzde (`ui/app.py`) bir "Video iddiaları" sekmesi; video, dakika, iddia ve sonuç tablosu ile
+- İsteğe bağlı: web arayüzünde (`ui/web/static/app.js`, sonuç sekmeleri) bir "Video iddiaları" sekmesi; video, dakika, iddia ve sonuç tablosu ile
   YouTube'a dakikalı link (`&t=190s`).
 
 ### 6.8 Adım 6: değerlendirme ve rapor

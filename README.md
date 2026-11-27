@@ -24,7 +24,7 @@ Sonra:
 docker compose up --build
 ```
 
-İlk açılışta `model-init` modeli Ollama'ya `bist-analist` adıyla kaydeder. Arayüz: <http://localhost:8501>.
+İlk açılışta `model-init` modeli Ollama'ya `bist-analist` adıyla kaydeder. Arayüz (FinTreX Analyst): <http://localhost:8501>.
 Analiz kayıtları `data/db/episodic.sqlite` dosyasına yazılır.
 
 GPU'suz makinede `docker-compose.yml` içindeki `deploy:` bloğunu silin.
@@ -34,7 +34,7 @@ GPU'suz makinede `docker-compose.yml` içindeki `deploy:` bloğunu silin.
 ```
 uv sync --extra dev --extra llm --extra ui --extra mcp
 uv run pytest -q
-uv run streamlit run src/bistharness/ui/app.py
+uv run python -m bistharness.ui.web     # FinTreX Analyst -> http://127.0.0.1:8501 (tarayıcıyı açar)
 ```
 
 Değerlendirme komutları ve veri ingest adımları: CLAUDE.md §12.

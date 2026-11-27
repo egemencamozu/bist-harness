@@ -10,7 +10,6 @@ unsloth_compiled_cache
 training
 data
 models
-reports
 tests
 reference
 *.gguf

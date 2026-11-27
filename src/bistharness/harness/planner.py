@@ -5,6 +5,13 @@
   every proposal is still checked by the harness (permission + tool input model) and invalid ones are logged.
 CHECK_DATA_QUALITY, BUILD_EVIDENCE and RISK_GATE arguments are built by the harness itself (they carry the run's
 envelopes), never by a planner.
+
+Sector comparison (S1, 2026-11-27, user decision): a stock is compared with its WHOLE sector, i.e. its peer group in
+config/universe.yaml (CLAUDE.md §11), not only with the other tickers named in the question ("Migros ve Şok
+sektörünün gerisinde mi?" -> Perakende: BIMAS, MGROS, SOKM, MAVI). Both planners pass peer-group names to
+rank_sector_relative_strength (`sector_groups`); a model proposal that lists tickers is mapped to their groups the same
+way (`canonical_sector_calls`). Tickers without a usable peer group (fewer than two members) keep the old custom-list
+behaviour. The lag evidence is still selected per requested ticker (evidence globs use {t}).
 """
 
 from __future__ import annotations
@@ -14,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Protocol
 
+from bistharness.core.config import Universe, load_universe
 from bistharness.core.enums import HarnessState, Scenario
 from bistharness.harness.llm_client import LLMClient, LLMResponse
 from bistharness.harness.policy import Policy
@@ -30,6 +38,49 @@ class ToolCall:
     tool: str
     arguments: dict[str, Any]
     origin: str = "plan"  # plan | llm | harness_default | harness
+
+
+def sector_groups(tickers: list[str], universe: Universe) -> list[str | list[str]]:
+    """`sector_or_tickers` values for S1: one peer-group name per distinct sector of the requested tickers, in order;
+    tickers without a usable peer group are kept as a custom list (or alone, then the tool reports why)."""
+    groups: list[str | list[str]] = []
+    loose: list[str] = []
+    for t in tickers:
+        inst = universe.instruments.get(t)
+        g = inst.peer_group if inst else None
+        if g and len(universe.peer_groups.get(g, ())) >= 2:
+            if g not in groups:
+                groups.append(g)
+        else:
+            loose.append(t)
+    if len(loose) >= 2:
+        groups.append(loose)
+    elif loose and not groups:
+        groups.append(loose[0])
+    return groups
+
+
+def canonical_sector_calls(calls: list[ToolCall], universe: Universe) -> list[ToolCall]:
+    """Map a proposed rank_sector_relative_strength call on ticker(s) to its peer group(s); other calls unchanged."""
+    out: list[ToolCall] = []
+    for c in calls:
+        spec = c.arguments.get("sector_or_tickers")
+        if (
+            c.tool != "rank_sector_relative_strength"
+            or not isinstance(spec, list | str)
+            or (isinstance(spec, str) and spec in universe.peer_groups)
+        ):
+            out.append(c)
+            continue
+        tickers = [str(x).upper() for x in (spec if isinstance(spec, list) else [spec])]
+        if not all(t in universe.instruments for t in tickers):
+            out.append(c)  # unknown names: the tool input check rejects and logs the call
+            continue
+        out += [
+            ToolCall(c.tool, {**c.arguments, "sector_or_tickers": g}, c.origin)
+            for g in sector_groups(tickers, universe)
+        ]
+    return out
 
 
 class Planner(Protocol):
@@ -98,12 +149,10 @@ class ScenarioPlanner:
                 out.append(("find_support_resistance", {**_window(req), "ticker": tk[0]}))
             return out
         if state is S.RUN_SECTOR_RELATIVE_ANALYSIS:
-            group = tk if len(tk) > 1 else tk[0]
+            horizon = int(req.params.get("horizon", 20))
             return [
-                (
-                    "rank_sector_relative_strength",
-                    {**_window(req), "sector_or_tickers": group, "horizon": int(req.params.get("horizon", 20))},
-                )
+                ("rank_sector_relative_strength", {**_window(req), "sector_or_tickers": g, "horizon": horizon})
+                for g in sector_groups(tk, load_universe())
             ]
         if state is S.RUN_PATTERN_AND_REVERSAL_ANALYSIS:
             if sc is Scenario.S2_WEEKDAY_PATTERN:
@@ -234,7 +283,7 @@ class LLMPlanner:
         resp = self.client.chat(messages, planner_schema(allowed))
         calls = parse_tool_calls(resp.text)
         self.pending.append(PlannerCall(state.value, messages, resp, len(calls)))
-        return calls
+        return canonical_sector_calls(calls, load_universe())
 
     def drain(self) -> list[PlannerCall]:
         out, self.pending = self.pending, []

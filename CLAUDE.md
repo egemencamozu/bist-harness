@@ -99,7 +99,7 @@ Project/
 │  ├─ tools/      15 MCP aracı: girdi doğrula → PIT oku → analytics çağır → ToolEnvelope döndür (ince katman)
 │  ├─ mcp_server/ server.py (mcp.server.fastmcp)
 │  ├─ harness/    state_machine · policy · evidence · risk_gate · validator · memory · replay · llm_client (Ollama)
-│  └─ ui/         Streamlit HITL arayüzü
+│  └─ ui/web/     FinTreX Analyst: Starlette JSON API + statik tek sayfa ön yüz (HITL, replay)
 ├─ training/      generate_dataset.py · train_qlora.py · export_gguf.py · Modelfile
 ├─ eval/          golden_questions.json · run_golden.py · ablation.py · metrics.py
 ├─ reference/instructor/   hocanın S2/S3 scriptlerinin salt-okunur kopyaları (parity testleri için)
@@ -387,7 +387,7 @@ Evidence ID'leri deterministik atanır (state sırası → araç → anahtar).
   uv run python -m bistharness.harness run --as-of 2026-09-10 --question "ASELS'te alt Bollinger ..." [--explainer llm]
   uv run python -m bistharness.harness list | replay --decision D-... [--llm] | review --decision D-... --verdict ACCEPT --reason "..."
   uv run python -m eval.run_golden --explainer template|llm [--model qwen2.5:7b] [--out reports/golden.json]
-  uv run streamlit run src/bistharness/ui/app.py
+  uv run python -m bistharness.ui.web          # FinTreX Analyst arayüzü, http://127.0.0.1:8501
   ```
 
 ## 13. Proje dışındaki mevcut varlıklar (salt okunur)
@@ -536,6 +536,22 @@ Verilen kararlar (2026-11-20):
   Transkript `.txt`'leri git'e girmez. Ingest `data/ingest/speech.py` (docstring tek doğruluk kaynağı). Sonraki adım:
   iddia çıkarma (yerel LLM önerir, sayı metinde birebir geçmeli) + araçlarla doğrulama (yeni araç = imza değişikliği
   → kullanıcı onayı).
+
+- **Arayüz (2026-11-27, kullanıcı kararı "ayrı arayüz", ürün adı FinTreX Analyst):** Streamlit arayüzü kaldırıldı →
+  `ui/web/` (server.py docstring'i tek doğruluk kaynağı): Starlette JSON API + CDN'siz statik ön yüz (plotly.js kurulu
+  paketten servis edilir), canlı 17 adım akışı (`HarnessConfig.progress` kancası; yalnız gösterim, analizi değiştirmez),
+  E# tıklanabilir kanıt kartları, PIT fiyat grafiği, backtest, validator denetimi, insan onayı, replay ve "Nasıl çalışır"
+  sayfası (rakamlar `reports/` dosyalarından okunur, elle yazılmaz). Görsel dil: kâğıt/mürekkep + tek sinyal rengi,
+  Instrument Serif / Geist / Geist Mono (OFL, `static/fonts/` içine gömülü; ağdan yazı tipi yüklenmez). Varsayılan 127.0.0.1:8501, aynı anda tek işlem
+  (409). Sunum için derin bağlantı: `#/?golden=Q3&explainer=template&planner=scenario&bolum=backtest`;
+  `--memory <dosya>` ile ayrı karar kaydı. Docker CMD de bu arayüz.
+
+- **S1 karşılaştırma grubu (2026-11-27, kullanıcı kararı):** sektör kıyası artık sorudaki hisselerle değil, hissenin
+  TÜM sektörüyle (`universe.yaml: peer_groups`) yapılır. Örnek: "Migros ve Şok sektörünün gerisinde mi?" → Perakende
+  (BIMAS, MGROS, SOKM, MAVI). İki planlayıcı da araca grup adını verir; modelin hisse listesi öneren çağrısı aynı
+  gruba çevrilir (`planner.sector_groups` / `canonical_sector_calls`, testli). Araç imzası değişmedi. Etki: golden Q1
+  HOLD → INVESTIGATE (şablonla 5/5 geçiyor), Q2–Q5 birebir aynı. `reports/golden_final.json` ve S1 içeren ablasyon/
+  dayanıklılık koşuları bu değişiklikten ÖNCEKİ davranışı yansıtır → final golden LLM ile yeniden koşulmalı.
 
 Açık:
 1. (kapandı) Makro anahtarsız çözüldü — §11.
