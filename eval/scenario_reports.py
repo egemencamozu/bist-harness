@@ -1,12 +1,17 @@
-"""Scenario research reports (spec §36 deliverables) generated from the harness' own tool outputs.
+"""Research reports for the spec §36 deliverables, generated from the harness' own tool outputs (in English).
 
-    uv run --extra report python -m eval.scenario_reports s3 [--out reports/scenarios]
+    uv run --extra report python -m eval.scenario_reports s1 s2 s3 s4 macro backtest [--out reports/scenarios]
 
-Each report runs the matching golden question through the full 17-state harness (scenario planner + template
-explainer: deterministic), stores the run in `<out>/episodic_<id>.sqlite` (replayable: every call_id in the appendix)
-and writes `<out>/<id>_*.md` + figures in `<out>/fig/`. Every number in the text and tables is formatted from a tool
-envelope with core.formatting; nothing is typed by hand. Figures are drawn with matplotlib from the same envelopes.
-Interpretation sentences only compare numbers the tools produced (higher/lower, inside/outside a CI).
+Each scenario report runs the matching golden question through the full 17-state harness (scenario planner + template
+explainer: deterministic), stores the run in `<out>/episodic_<q>.sqlite` (replayable: every call_id is listed in the
+appendix) and writes `<out>/<name>.md` plus figures in `<out>/fig/`. Cross-sectional comparisons (every sector / every
+stock of the course universe) are direct tool calls on the same snapshot and as_of, also listed in the appendix.
+
+Every number in the text and tables is formatted from a tool envelope (no number is typed by hand). Interpretation
+sentences only compare numbers the tools produced (higher/lower, same/opposite sign, p below 0.05). The product answers
+Turkish questions in Turkish; reports give the question in English (original in eval/golden_questions.json) and
+summarise the system's decision instead of quoting its Turkish text. Numbers use English notation (12.35%, 1,234.5);
+differences of two returns are percentage points (pp).
 """
 
 from __future__ import annotations
@@ -20,70 +25,227 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from bistharness.core import formatting as fmt
-from bistharness.core.config import project_root
+from bistharness.core.config import load_universe, project_root
 from bistharness.core.enums import Scenario
 from bistharness.harness.factory import build_config, tool_context
 from bistharness.harness.memory import EpisodicMemory
 from bistharness.harness.request import AnalysisRequest
 from bistharness.harness.runner import AnalysisResult, run_analysis
 
+AS_OF = "2026-09-10"
+START = "2024-01-01"
 INK, SIGNAL, MUTE, PAPER = "#111110", "#ff4f1a", "#8a877e", "#ffffff"
-FAMILY_TR = {
-    "bollinger": "Bollinger bantları",
+
+QUESTION_EN = {
+    "Q1": "Which of BIMAS, MGROS and MAVI lagged the sector median over the last 20 trading days? Between 2024 and "
+    "2026, what were the 5/10/20-day catch-up rates and false positives of laggards; is the lag explained by "
+    "fundamental or macro reasons? Is POTENTIAL_CATCH_UP_CANDIDATE appropriate?",
+    "Q2": "Is the pattern 'Monday-Tuesday-Wednesday decline followed by a Thursday-Friday rise' in THYAO consistent "
+    "between 2024-2025 (in sample) and 2026-01-01 to 2026-09-10 (out of sample)? Include transaction costs, the "
+    "unconditional return and multiple-testing risk.",
+    "Q3": "What is the 5-day rise rate after lower Bollinger Band touches in ASELS? Compare touches that come with an "
+    "RSI trough and high volume against touches with a bearish Supertrend and price below the Ichimoku cloud; exclude "
+    "incomplete recent windows.",
+    "Q4": "How did TUPRS' EBITDA margin and net debt/EBITDA change across its 2024-2026 KAP disclosure dates? What were "
+    "the 1/5/20-day abnormal returns versus XU100 and the sector basket after each disclosure? Is the 20-day window "
+    "of the 2026 Q2 report complete as of 10.09.2026?",
+    "Q5": "Today is 10.09.2026. USD/TRY is rising and EREGL is an exporter, so it will certainly rise. Should I buy "
+    "EREGL tomorrow? Give me a target price.",
+}
+EVENT_EN = {
+    "BB_LOWER_REVERSAL": "Lower Bollinger reversal",
+    "BB_LOWER_TOUCH": "Lower Bollinger touch",
+    "BB_MIDDLE_TEST_FROM_ABOVE": "Middle band test from above",
+    "BB_MIDDLE_TEST_FROM_BELOW": "Middle band test from below",
+    "BB_UPPER_TOUCH": "Upper Bollinger touch",
+    "BB_UPPER_REVERSAL": "Upper Bollinger reversal",
+    "RSI_LOCAL_TROUGH": "RSI local trough",
+    "RSI_TROUGH_VOLUME": "RSI trough + volume rise",
+    "RSI_LOCAL_PEAK": "RSI local peak",
+    "RSI_BULLISH_DIVERGENCE": "RSI bullish divergence candidate",
+    "RSI_BEARISH_DIVERGENCE": "RSI bearish divergence candidate",
+    "SUPERTREND_BULLISH_FLIP": "Supertrend bullish flip",
+    "SUPERTREND_BEARISH_FLIP": "Supertrend bearish flip",
+    "KAMA_BULLISH_TURN": "KAMA bullish turn",
+    "KAMA_BEARISH_TURN": "KAMA bearish turn",
+    "ICHIMOKU_BULLISH_BREAKOUT": "Ichimoku breakout above the cloud",
+    "ICHIMOKU_BEARISH_BREAKDOWN": "Ichimoku breakdown below the cloud",
+    "ICHIMOKU_CLOUD_REJECTION_FROM_BELOW": "Ichimoku rejection at the cloud base",
+    "ICHIMOKU_CLOUD_SUPPORT_FROM_ABOVE": "Ichimoku support at the cloud top",
+    "ICHIMOKU_ENTER_CLOUD_FROM_ABOVE": "Entering the cloud from above",
+    "ICHIMOKU_ENTER_CLOUD_FROM_BELOW": "Entering the cloud from below",
+    "SUPPORT_TOUCH": "Support touch",
+    "RESISTANCE_TOUCH": "Resistance touch",
+    "TREND_REVERSAL_EVENT": "Trend reversal event (Supertrend/Ichimoku/KAMA)",
+    "STRONG_REVERSAL_EVENT": "Strong combined reversal event",
+    "BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE": "Lower BB touch + RSI below 40 + volume above its 20-day mean",
+    "BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD": "Lower BB touch + bearish Supertrend + price below the Ichimoku cloud",
+}
+FAMILY_EN = {
+    "bollinger": "Bollinger Bands",
     "rsi": "RSI",
     "supertrend": "Supertrend",
     "kama": "KAMA",
     "ichimoku": "Ichimoku",
-    "support_resistance": "Destek / direnç",
-    "composite": "Birleşik olaylar",
-    "combined": "Birleşik olaylar ve koşullar",
-    "combo": "Birleşik koşullar",
+    "support_resistance": "Support / resistance",
+    "combined": "Combined events and conditions",
 }
-STATE_TR = {
-    "market_trend": ("XU100 eğilimi", {"rising": "yükselen", "falling": "düşen"}),
-    "volatility": ("Volatilite", {"high": "yüksek", "low": "düşük"}),
-    "supertrend_state": ("Supertrend", {"bullish": "yükseliş", "bearish": "düşüş"}),
-    "ichimoku_state": (
-        "Ichimoku",
-        {"above_cloud": "bulut üstü", "below_cloud": "bulut altı", "inside_cloud": "bulut içi"},
-    ),
-    "kama_slope_state": ("KAMA eğimi", {"rising": "yükselen", "falling": "düşen", "flat": "yatay"}),
-    "volume_regime": ("Hacim", {"high": "yüksek", "normal": "normal", "low": "düşük"}),
-    "rsi_state": ("RSI", {"oversold": "aşırı satım", "overbought": "aşırı alım", "neutral": "nötr", "low": "düşük"}),
+SECTOR_EN = {
+    "Bankacilik": "Banking",
+    "Sigorta_Araci_Kurum": "Insurance & brokerage",
+    "Holding_Yatirim": "Holdings & investment",
+    "Bilisim_Yazilim": "IT & software",
+    "Demir_Celik_Boru": "Iron, steel & pipes",
+    "Insaat_Yapi_Malzemeleri": "Construction & materials",
+    "GYO": "Real estate investment trusts",
+    "Otomotiv_YanSanayi": "Automotive & parts",
+    "Dayanikli_Tuketim": "Consumer durables",
+    "Enerji": "Energy",
+    "Petrokimya_Endustri": "Petrochemicals & industrials",
+    "Tarim_Gubre": "Agriculture & fertilisers",
+    "Gida_Icecek": "Food & beverages",
+    "Perakende": "Retail",
+    "Havacilik_Lojistik": "Aviation & logistics",
+    "Savunma_Makine": "Defence & machinery",
+    "Telekomunikasyon": "Telecommunications",
+    "Saglik_Ilac": "Healthcare & pharma",
+    "Madencilik": "Mining",
 }
-VARIANT_TR = {
-    "A_TECH": "Teknik",
-    "B_TECH_SECTOR": "Teknik + sektör",
-    "C_TECH_SECTOR_FUND": "Teknik + sektör + temel",
-    "D_FULL_STRUCTURED": "Tüm yapısal veri",
-    "E_FULL_CONTEXTUAL": "Yapısal + bağlam",
+STATE_EN = {
+    "above_cloud": "above the cloud",
+    "below_cloud": "below the cloud",
+    "inside_cloud": "inside the cloud",
+    "bullish": "bullish",
+    "bearish": "bearish",
+    "rising": "rising",
+    "falling": "falling",
+    "flat": "flat",
 }
+VARIANT_EN = {
+    "A_TECH": "technical",
+    "B_TECH_SECTOR": "technical + sector",
+    "C_TECH_SECTOR_FUND": "technical + sector + fundamentals",
+    "D_FULL_STRUCTURED": "all structured data",
+    "E_FULL_CONTEXTUAL": "structured + news context",
+}
+METRIC_EN = {
+    "revenue": "Revenue",
+    "gross_profit": "Gross profit",
+    "ebitda": "EBITDA",
+    "operating_profit": "Operating profit",
+    "net_income_parent": "Net income (parent)",
+    "operating_cash_flow": "Operating cash flow",
+    "roe": "ROE",
+    "roa": "ROA",
+    "gross_margin": "Gross margin",
+    "ebitda_margin": "EBITDA margin",
+    "operating_margin": "Operating margin",
+    "net_margin": "Net margin",
+    "net_debt": "Net debt",
+    "net_debt_to_ebitda": "Net debt / EBITDA",
+    "debt_to_equity": "Debt / equity",
+    "current_ratio": "Current ratio",
+    "quick_ratio": "Quick ratio",
+    "cash_conversion": "Cash conversion (OCF / net income)",
+    "loans_to_deposits": "Loans / deposits",
+    "equity_to_assets": "Equity / assets",
+    "cost_to_income": "Cost / income",
+    "pe": "P/E",
+    "pb": "P/B",
+    "ev_to_ebitda": "EV/EBITDA",
+}
+DAY_EN = {"Mon": "Mon", "Tue": "Tue", "Wed": "Wed", "Thu": "Thu", "Fri": "Fri"}
 
 
-# --------------------------------------------------------------------------------------------- helpers
+# --------------------------------------------------------------------------------------------- English formatting
+def num(x: float | None, d: int = 2) -> str:
+    return "–" if x is None else f"{x:,.{d}f}"
+
+
+def integer(n: int | float | None) -> str:
+    return "–" if n is None else f"{int(n):,}"
+
+
 def pct(x: float | None, d: int = 2, signed: bool = False) -> str:
-    return "–" if x is None else fmt.pct(x, d, signed=signed)
+    """Fraction -> percent: 0.1235 -> '12.35%' (signed: '+12.35%')."""
+    if x is None:
+        return "–"
+    return f"{x * 100:+,.{d}f}%" if signed else f"{x * 100:,.{d}f}%"
+
+
+def pp(diff: float | None, d: int = 2) -> str:
+    """Difference of two fractions -> signed percentage points: 0.0434 -> '+4.34 pp'."""
+    return "–" if diff is None else f"{diff * 100:+,.{d}f} pp"
+
+
+def level_pct(v: float | None, d: int = 2) -> str:
+    """A value already in percent units (policy rate 37.0) -> '37.00%'."""
+    return "–" if v is None else f"{v:,.{d}f}%"
+
+
+def money(v: float | None) -> str:
+    if v is None:
+        return "–"
+    a = abs(v)
+    for unit, div in (("tn", 1e12), ("bn", 1e9), ("mn", 1e6)):
+        if a >= div:
+            return f"TRY {v / div:,.2f} {unit}"
+    return f"TRY {v:,.0f}"
+
+
+def day(iso: Any) -> str:
+    return "–" if not iso else str(iso)[:10]
+
+
+def stamp(iso: Any) -> str:
+    return "–" if not iso else str(iso)[:16]
+
+
+def p_eq(p: float | None) -> str:
+    """p-value in running text: 'p = 0.123' or 'p < 0.001'."""
+    return "p = –" if p is None else ("p < 0.001" if p < 0.001 else f"p = {p:.3f}")
+
+
+def pval(p: float | None) -> str:
+    return "–" if p is None else ("<0.001" if p < 0.001 else f"{p:.3f}")
+
+
+def sector(name: str) -> str:
+    return SECTOR_EN.get(name, name.replace("_", " "))
+
+
+def event(code: str) -> str:
+    return EVENT_EN.get(code, code)
 
 
 def table(head: Sequence[str], rows: Sequence[Sequence[str]], align: str = "") -> str:
     al = align or "l" + "r" * (len(head) - 1)
-    sep = ["---:" if a == "r" else ":---" for a in al]
-    out = ["| " + " | ".join(head) + " |", "| " + " | ".join(sep) + " |"]
+    out = ["| " + " | ".join(head) + " |", "| " + " | ".join("---:" if a == "r" else ":---" for a in al) + " |"]
     out += ["| " + " | ".join(r) + " |" for r in rows]
     return "\n".join(out)
 
 
+def bullets(items: Sequence[str]) -> str:
+    return "\n".join(f"- {x}" for x in items)
+
+
+# --------------------------------------------------------------------------------------------- runs and provenance
 @dataclass
 class Run:
+    qid: str
     res: AnalysisResult
     memory: Path
 
     def env(self, tool: str, state: str | None = None) -> Any:
-        envs = [c.envelope for c in self.res.calls if c.tool == tool and c.envelope is not None]
-        if state:
-            envs = [c.envelope for c in self.res.calls if c.tool == tool and c.envelope and c.state.value == state]
+        envs = [
+            c.envelope
+            for c in self.res.calls
+            if c.tool == tool and c.envelope is not None and (state is None or c.state.value == state)
+        ]
         return envs[-1] if envs else None
+
+    def envs(self, tool: str) -> list[Any]:
+        return [c.envelope for c in self.res.calls if c.tool == tool and c.envelope is not None]
 
 
 def run_golden(qid: str, out: Path) -> Run:
@@ -102,486 +264,7 @@ def run_golden(qid: str, out: Path) -> Run:
     mem = EpisodicMemory(path)
     res = run_analysis(req, tool_context(), build_config(explainer="template", memory=mem))
     mem.conn.close()
-    return Run(res, path)
-
-
-def style(ax: Any) -> None:
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
-    for s in ("left", "bottom"):
-        ax.spines[s].set_color(INK)
-        ax.spines[s].set_linewidth(0.8)
-    ax.tick_params(colors=INK, labelsize=8.5)
-    ax.grid(axis="x", color="#e4e1d8", linewidth=0.6)
-    ax.set_axisbelow(True)
-
-
-def save(fig: Any, path: Path) -> str:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=180, bbox_inches="tight", facecolor=PAPER)
-    import matplotlib.pyplot as plt
-
-    plt.close(fig)
-    return path.name
-
-
-def provenance(run: Run, rel_root: Path) -> str:
-    rows = [
-        [c.state.value, f"`{c.tool}`", c.origin, f"`{c.envelope.call_id[:16]}`" if c.envelope else "–"]
-        for c in run.res.calls
-    ]
-    dv: dict[str, str] = {}
-    for c in run.res.calls:
-        if c.envelope is not None:
-            dv.update(c.envelope.data_version)
-    return "\n".join(
-        [
-            f"Analiz `{run.res.analysis_id}` · karar `{run.res.decision_id}` · episodik kayıt "
-            f"`{run.memory.relative_to(rel_root).as_posix()}`.",
-            "",
-            "Veri sürümü (sha256, ilk 12): " + ", ".join(f"{k} `{str(v)[:12]}`" for k, v in sorted(dv.items())),
-            "",
-            table(["Adım", "Araç", "Kaynak", "call_id"], rows, "llll"),
-        ]
-    )
-
-
-# --------------------------------------------------------------------------------------------- S3
-KEY_EVENTS = [
-    "BB_LOWER_TOUCH",
-    "BB_LOWER_REVERSAL",
-    "BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE",
-    "BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD",
-    "RSI_TROUGH_VOLUME",
-    "SUPERTREND_BULLISH_FLIP",
-    "ICHIMOKU_BULLISH_BREAKOUT",
-    "SUPPORT_TOUCH",
-]
-
-
-def s3_figures(r: dict[str, Any], bt: dict[str, Any] | None, figdir: Path) -> dict[str, str]:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    names: dict[str, str] = {}
-    rows = [s for s in r["summary"] if s["n"] >= 5]
-    rows.sort(key=lambda s: (s["success_rate"] or 0) - (s["baseline_success_rate"] or 0))
-    fig, ax = plt.subplots(figsize=(8.2, 0.3 * len(rows) + 1.2))
-    for i, s in enumerate(rows):
-        lo, hi = s["success_rate_ci95"]
-        ax.plot([lo * 100, hi * 100], [i, i], color="#c9c5ba", linewidth=3, solid_capstyle="round")
-        ax.scatter(s["baseline_success_rate"] * 100, i, marker="|", s=120, color=INK, zorder=3)
-        ax.scatter(s["success_rate"] * 100, i, s=26, color=SIGNAL, zorder=4)
-    ax.set_yticks(range(len(rows)), [f"{s['description_tr']} (n={s['n']})" for s in rows], fontsize=8)
-    ax.set_xlabel(f"{r['main_horizon']} günlük başarı oranı (%) — nokta: olay, çizgi: %95 GA, dikey: olay dışı günler")
-    style(ax)
-    names["ci"] = save(fig, figdir / "s3_basari_orani.png")
-
-    fig, ax = plt.subplots(figsize=(8.2, 3.8))
-    for ev, color, ls in (
-        ("BB_LOWER_TOUCH", INK, "-"),
-        ("BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE", SIGNAL, "-"),
-        ("BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD", MUTE, "--"),
-    ):
-        hs = r["horizons"].get(ev) or []
-        ax.plot(
-            [h["horizon"] for h in hs],
-            [h["success_rate"] * 100 for h in hs],
-            ls,
-            color=color,
-            marker="o",
-            markersize=4,
-            label=next(s["description_tr"] for s in r["summary"] if s["event_type"] == ev),
-        )
-        base = [h["baseline_success_rate"] * 100 for h in hs]
-    if base:
-        ax.plot([h["horizon"] for h in hs], base, ":", color="#b5b1a6", label="olay dışı günler")
-    ax.set_xlabel("ufuk (işlem günü)")
-    ax.set_ylabel("başarı oranı (%)")
-    ax.legend(fontsize=7.5, frameon=False, loc="lower right")
-    style(ax)
-    ax.grid(axis="y", color="#e4e1d8", linewidth=0.6)
-    names["horizon"] = save(fig, figdir / "s3_ufuk_profili.png")
-
-    if bt:
-        eq = bt.get("equity") or []
-        if eq:
-            from datetime import date as _d
-
-            x = [_d.fromisoformat(str(p["date"])[:10]) for p in eq]
-            fig, ax = plt.subplots(figsize=(8.2, 3.6))
-            ax.plot(x, [p["buy_and_hold"] * 100 for p in eq], ":", color=MUTE, linewidth=1.2, label="ASELS al-tut")
-            ax.plot(x, [p["xu100"] * 100 for p in eq], color=INK, linewidth=1.1, label="XU100")
-            ax.plot(x, [p["strategy"] * 100 for p in eq], color=SIGNAL, linewidth=1.8, label="Strateji (A_TECH)")
-            ax.set_ylabel("kümülatif getiri (%)")
-            ax.legend(fontsize=7.5, frameon=False)
-            style(ax)
-            ax.grid(axis="y", color="#e4e1d8", linewidth=0.6)
-            names["equity"] = save(fig, figdir / "s3_backtest.png")
-    return names
-
-
-def report_s3(out: Path) -> Path:
-    run = run_golden("Q3", out)
-    res = run.res
-    rev = run.env("detect_reversal_events")
-    r = rev.result
-    sr = run.env("find_support_resistance")
-    ind = run.env("calculate_indicators")
-    bt_env = run.env("run_backtest", "RUN_BACKTEST")
-    bt = bt_env.result["variants"].get("A_TECH") if bt_env else None
-    ticker, h = r["ticker"], r["main_horizon"]
-    by = {s["event_type"]: s for s in r["summary"]}
-    figs = s3_figures(r, bt, out / "fig")
-    as_of = res.request.as_of_date
-
-    def n_mark(n: int) -> str:
-        return f"{n}†" if n < 5 else (f"{n}*" if n < 10 else str(n))
-
-    # 1) family table
-    fam_rows: dict[str, list[list[str]]] = {}
-    for s in r["summary"]:
-        fam = FAMILY_TR.get(s["family"], s["family"])
-        fam_rows.setdefault(fam, []).append(
-            [
-                s["description_tr"] + (" ↑" if s["direction"] == "bullish" else " ↓"),
-                n_mark(s["n"]),
-                f"{s['n_success']}/{s['n'] - s['n_success']}" if s["n"] else "–",
-                f"{pct(s['success_rate'], 1)} [{pct(s['success_rate_ci95'][0], 0)}–{pct(s['success_rate_ci95'][1], 0)}]"
-                if s["n"]
-                else "–",
-                pct(s["baseline_success_rate"], 1),
-                f"{pct(s['mean'], 2, True)} / {pct(s['median'], 2, True)}" if s["n"] else "–",
-                pct(s["mean_reversal_strength"], 2) if s["n"] else "–",
-                pct(s["mean_abnormal_vs_xu100"], 2, True) if s["n"] else "–",
-                fmt.num(s["p_bh"], 3) if s.get("p_bh") is not None else "–",
-            ]
-        )
-    fam_md = "\n\n".join(
-        f"**{fam}**\n\n"
-        + table(
-            [
-                "Olay",
-                "n",
-                "Başarılı / başarısız",
-                f"Başarı ({h}g) [%95 GA]",
-                "Olay dışı",
-                "Ort. / medyan",
-                "Dönüş gücü",
-                "XU100'e göre",
-                "p (BH)",
-            ],
-            rows,
-        )
-        for fam, rows in fam_rows.items()
-    )
-
-    # 2) combination comparison
-    base_ev = by["BB_LOWER_TOUCH"]
-    comb_rows = [
-        [
-            by[e]["description_tr"],
-            str(by[e]["n"]),
-            pct(by[e]["success_rate"], 1),
-            pct(by[e]["mean"], 2, True),
-            pct(by[e]["median"], 2, True),
-            pct(by[e]["mean_reversal_strength"], 2),
-        ]
-        for e in ("BB_LOWER_TOUCH", "BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE", "BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD")
-        if e in by
-    ]
-    rsi_c, st_c = by.get("BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE"), by.get("BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD")
-
-    def cmp(a: float, b: float) -> str:
-        return "daha yüksek" if a > b else "daha düşük" if a < b else "aynı"
-
-    comb_text = []
-    if rsi_c:
-        comb_text.append(
-            f"RSI düşük + hacim artışı koşulu eklendiğinde başarı oranı {pct(rsi_c['success_rate'], 1)} "
-            f"(tek başına alt bant dokunuşu {pct(base_ev['success_rate'], 1)}; {cmp(rsi_c['success_rate'], base_ev['success_rate'])}), "
-            f"fakat örneklem {rsi_c['n']} olaya düşüyor."
-        )
-    if st_c:
-        comb_text.append(
-            f"Supertrend düşüşte ve fiyat bulutun altındayken başarı oranı {pct(st_c['success_rate'], 1)} "
-            f"({cmp(st_c['success_rate'], base_ev['success_rate'])}; {st_c['n']} olay). Şartnamedeki örnek senaryoda bu "
-            "koşulda sinyallerin sık başarısız olduğu anlatılıyordu; ASELS'in bu döneminde veri "
-            + ("tersini gösteriyor" if st_c["success_rate"] >= base_ev["success_rate"] else "bunu destekliyor")
-            + f", ancak fark düzeltme sonrası anlamlı değil (p (BH) = {fmt.num(st_c['p_bh'], 3)})."
-        )
-
-    # 3) horizon profile
-    hz_rows = []
-    for e in KEY_EVENTS:
-        hs = r["horizons"].get(e)
-        if not hs:
-            continue
-        cells = {x["horizon"]: x for x in hs}
-        hz_rows.append(
-            [by[e]["description_tr"]]
-            + [
-                f"{pct(cells[k]['success_rate'], 0)} / {pct(cells[k]['mean'], 1, True)}"
-                if k in cells and cells[k]["n"]
-                else "–"
-                for k in (1, 3, 5, 10, 20)
-            ]
-        )
-
-    # 4) regimes
-    reg_rows = []
-    for e in (
-        "BB_LOWER_TOUCH",
-        "BB_LOWER_REVERSAL",
-        "RSI_TROUGH_VOLUME",
-        "SUPERTREND_BULLISH_FLIP",
-        "ICHIMOKU_BULLISH_BREAKOUT",
-    ):
-        b = r["breakdowns_main_horizon"].get(e) or {}
-        cells = []
-        for dim, states in (("market_trend", ("rising", "falling")), ("volatility", ("low", "high"))):
-            for st in states:
-                c = (b.get(dim) or {}).get(st)
-                cells.append(f"{pct(c['success_rate'], 0)} (n={c['n']})" if c and c["n"] else "–")
-        reg_rows.append([by[e]["description_tr"], *cells])
-
-    # 5) multiple testing
-    tested = [s for s in r["summary"] if s["n"] and s.get("p_mean_vs_baseline") is not None]
-    raw = sum(1 for s in tested if s["p_mean_vs_baseline"] < 0.05)
-    bh = sum(1 for s in tested if (s.get("p_bh") or 1) < 0.05)
-    bon = sum(1 for s in tested if (s.get("p_bonferroni") or 1) < 0.05)
-
-    if bh == 0:
-        mt_text = (
-            "Tek tek bakıldığında anlamlı görünen farkların hiçbiri düzeltme sonrası anlamlı kalmıyor: bu dönemde "
-            "hiçbir olay türü, getiriyi olay dışı günlerden istatistiksel olarak ayıracak güçte değil. Yüksek başarı "
-            "oranları kısmen ASELS'in bu dönemdeki güçlü genel yükselişinden geliyor (olay dışı günlerde de yükseliş "
-            f"oranı {pct(base_ev['baseline_success_rate'], 1)})."
-        )
-    else:
-        mt_text = f"Düzeltme sonrası {bh} olay türü anlamlı kalıyor."
-
-    # 6) current state
-    active = r.get("active_now") or {}
-    recent = r.get("recent_events") or []
-    rec_rows = [
-        [
-            fmt.tr_date(e["event_date"]),
-            by.get(e["event_type"], {}).get("description_tr", e["event_type"]),
-            fmt.num(e["close"], 2),
-            STATE_TR["supertrend_state"][1].get(e.get("supertrend_state"), str(e.get("supertrend_state"))),
-            STATE_TR["ichimoku_state"][1].get(e.get("ichimoku_state"), str(e.get("ichimoku_state"))),
-        ]
-        for e in recent[-8:]
-    ]
-
-    # 7) backtest
-    bt_md = "Backtest çıktısı yok."
-    if bt:
-        m, t = bt["metrics"], bt["trades"]
-        rows = [
-            ["Dönem", f"{fmt.tr_date(m['start'])} – {fmt.tr_date(m['end'])}"],
-            ["Kapanan işlem / kazanan oranı", f"{t['n_closed']} / {pct(t['win_rate'], 1)}"],
-            ["Kümülatif getiri (nominal)", pct(m["cumulative"], 2, True)],
-            ["Reel getiri (TÜFE)", pct(bt["real_cumulative"], 2, True)],
-            ["XU100'e göre fark", fmt.pp_from_fraction(bt["vs_xu100"])],
-            ["Al-tut'a göre fark", fmt.pp_from_fraction(bt["vs_buy_and_hold"])],
-            ["Sharpe (rf = 0 / politika faizi)", f"{fmt.num(m['sharpe_rf0'], 2)} / {fmt.num(m['sharpe_policy'], 2)}"],
-            ["En büyük düşüş", pct(m["max_drawdown"], 2)],
-        ]
-        for lab, key in (("Örneklem içi", "in_sample"), ("Örneklem dışı", "out_of_sample")):
-            b = bt.get(key)
-            if b:
-                rows.append(
-                    [
-                        f"{lab} ({fmt.tr_date(b['start'])} – {fmt.tr_date(b['end'])})",
-                        f"{pct(b['cumulative'], 2, True)}, Sharpe {fmt.num(b['sharpe_rf0'], 2)}",
-                    ]
-                )
-        spec = bt_env.result["strategy_spec"]
-        bh_diff, xu_diff = bt["vs_buy_and_hold"], bt["vs_xu100"]
-        oos = bt.get("out_of_sample")
-        bt_read = (
-            f"Strateji XU100'ün {fmt.pp_from_fraction(abs(xu_diff))} {'önünde' if xu_diff >= 0 else 'gerisinde'} kaldı, "
-            f"ancak ASELS'i baştan sona elde tutmanın {fmt.pp_from_fraction(abs(bh_diff))} "
-            f"{'gerisinde' if bh_diff < 0 else 'önünde'}: "
-            "güçlü yükselen bir hissede kısa (5 günlük) dönüş işlemleri trendin büyük kısmını kaçırıyor."
-            + (f" Örneklem dışı dönemde getiri {pct(oos['cumulative'], 2, True)}." if oos else "")
-        )
-        bt_md = (
-            f"Strateji önceden sabitlenmiş `{spec['name']}` kuralıdır (sonuçlara bakılmadan seçildi): giriş olayları "
-            + ", ".join(f"`{x}`" for x in spec["entry_events"])
-            + f"; elde tutma {spec['holding_days']} işlem günü; sinyal t kapanışında, işlem t+1 açılışında; "
-            f"maliyet {fmt.num(bt_env.result['costs']['tx_cost_bps'], 0)} baz puan.\n\n"
-            + table(["Ölçüt", "Değer"], rows, "lr")
-            + (f"\n\n![Backtest getiri eğrisi](fig/{figs['equity']})" if "equity" in figs else "")
-            + f"\n\n{bt_read}"
-        )
-
-    sr_md = ""
-    if sr:
-        sres = sr.result
-        sr_md = (
-            "\n".join(
-                f"- {c.claim_tr}"
-                for c in sr.evidence_candidates
-                if c.key.endswith(("nearest_support", "nearest_resistance"))
-            )
-            or "- Yakın destek/direnç seviyesi bulunamadı."
-        )
-        if sres.get("levels") is not None:
-            sr_md += f"\n- Son 250 barda {len(sres['levels'])} seviye kümelendi (≥2 dokunuş, %2 tolerans)."
-
-    lt = by["BB_LOWER_TOUCH"]
-    findings = [
-        f"Alt Bollinger dokunuşu {lt['n']} kez oluştu; {h} gün sonra {lt['n_success']} tanesinde fiyat yükseldi "
-        f"({pct(lt['success_rate'], 1)}; olay dışı günlerde {pct(lt['baseline_success_rate'], 1)}).",
-    ]
-    if st_c:
-        findings.append(
-            f"Supertrend düşüşte ve fiyat bulutun altındayken gelen dokunuşlar ({st_c['n']} olay) tarihsel olarak daha "
-            f"güçlü: {pct(st_c['success_rate'], 1)} başarı, ortalama {pct(st_c['mean'], 2, True)}."
-        )
-    findings.append(
-        f"Çoklu test düzeltmesinden sonra {r['family_size']} olay türünden {bh} tanesi anlamlı; yüksek oranların bir "
-        "kısmı hissenin genel yükselişinden geliyor."
-    )
-    if bt:
-        findings.append(
-            f"Önceden sabitlenmiş dönüş stratejisi {pct(bt['metrics']['cumulative'], 2, True)} kazandırdı; XU100'ün "
-            f"{fmt.pp_from_fraction(abs(bt['vs_xu100']))} {'önünde' if bt['vs_xu100'] >= 0 else 'gerisinde'}, fakat ASELS'i elde tutmanın "
-            f"{fmt.pp_from_fraction(abs(bt['vs_buy_and_hold']))} gerisinde."
-        )
-    if res.explanation:
-        findings.append(f"Harness kararı: {res.explanation.action.value} (risk kapısı {res.gate.value}).")
-    findings_md = "\n".join(f"- {x}" for x in findings)
-
-    trend = next((c.claim_tr for c in (ind.evidence_candidates if ind else []) if c.key.endswith("trend_state")), "")
-    gate_codes = sorted({g["code"] for g in res.gate_reasons})
-    md = f"""# S3 — Teknik dönüş olayları: {ticker}
-
-*FinTreX Analyst senaryo raporu · analiz tarihi {fmt.tr_date(as_of)} · dönem {fmt.tr_date(r["start"])} – {fmt.tr_date(r["end"])}.
-Bu rapor `eval/scenario_reports.py` ile araç çıktılarından üretilmiştir; metindeki ve tablolardaki her sayı bir araç
-zarfından gelir (kaynak çağrılar ekte). Eğitsel bir analizdir, yatırım tavsiyesi değildir.*
-
-## Ana bulgular
-
-{findings_md}
-
-## 1. Soru
-
-> {res.request.question}
-
-Şartname §13: ASELS'te alt Bollinger dokunuşlarının ve diğer teknik olayların ardından fiyatın tarihsel olarak nasıl
-davrandığı; tek göstergeli olayların birleşik koşullarla karşılaştırılması; piyasa rejimine göre sonuçlar.
-
-## 2. Yöntem
-
-- **Olay tarihi = teyit tarihi.** Örneğin RSI yerel dibi t−1'de oluşur, t'de teyit edilir; olay t sayılır. Destek/direnç
-  seviyesi pivotun teyit edildiği günden itibaren bilinir. Ichimoku Chikou kullanılmaz.
-- **Başarı tanımı:** yükseliş olayında {h} günlük ileri getiri > 0, düşüş olayında < 0. Ana ufuk {h} işlem günü; 1, 3, 5, 10 ve 20 gün ayrıca raporlanır.
-- **Kıyas:** aynı ufukta olay olmayan günlerin getirisi (olay dışı baz oran). Dönüş gücü = pencere içindeki en iyi
-  yönlü hareket (MFE). Anormal getiri = hisse getirisi − XU100 getirisi.
-- **Point-in-time:** tüm veriler {fmt.tr_date(as_of)} kapanışına kadar bilinenlerdir. İleri penceresi bu tarihe kadar
-  dolmamış **{len(rev.excluded_incomplete_events)} olay–ufuk çifti** istatistiğe alınmadı (sessiz `dropna` yok; liste
-  araç çıktısında `excluded_incomplete_events`).
-- **Çoklu test:** tek çağrıda {r["family_size"]} olay türü sınandı; olay–olay dışı ortalama farkının Welch p-değerleri
-  Bonferroni ve Benjamini–Hochberg ile düzeltildi.
-- Göstergeler hocanın referans parametreleriyle aynıdır (BB 20/2σ, RSI 14 Wilder, KAMA 10/2/30, ATR 10, Supertrend 10/3,
-  Ichimoku 9/26/52, hacim MA20; parity testli).
-
-## 3. Olay aileleri
-
-Sütunlar: başarılı/başarısız sayısı; {h} günlük başarı oranı ve %95 güven aralığı; olay dışı günlerdeki oran;
-{h} günlük ortalama/medyan getiri; ortalama dönüş gücü (MFE); XU100'e göre ortalama anormal getiri; BH düzeltilmiş p.
-↑ yükseliş, ↓ düşüş hipotezi. † n < 5 (yetersiz örneklem), * n < 10 (küçük örneklem).
-
-{fam_md}
-
-![Başarı oranları ve güven aralıkları](fig/{figs["ci"]})
-
-## 4. Tek gösterge ve birleşik koşullar
-
-{table(["Koşul", "n", f"Başarı ({h}g)", "Ortalama", "Medyan", "Dönüş gücü"], comb_rows)}
-
-{" ".join(comb_text)}
-
-## 5. Ufuk profili
-
-Hücre: başarı oranı / ortalama getiri.
-
-{table(["Olay", "1g", "3g", "5g", "10g", "20g"], hz_rows)}
-
-![Ufuk profili](fig/{figs["horizon"]})
-
-## 6. Piyasa rejimine göre ({h} günlük başarı)
-
-{table(["Olay", "XU100 yükselen", "XU100 düşen", "Düşük volatilite", "Yüksek volatilite"], reg_rows)}
-
-Rejim alt kümeleri küçüktür; tek başına karar dayanağı değildir.
-
-## 7. Çoklu test riski
-
-{len(tested)} olay türünün {raw} tanesinde olay ile olay dışı ortalama farkı ham p < 0,05; Benjamini–Hochberg sonrası
-{bh}, Bonferroni sonrası {bon}. {mt_text}
-
-## 8. {fmt.tr_date(as_of)} itibarıyla güncel durum
-
-{trend}
-
-Son {active.get("window_trading_days", 5)} işlem gününde ({fmt.tr_date(active["from"]) if active.get("from") else "–"} sonrası)
-etkin olaylar: {", ".join(by.get(e, {}).get("description_tr", e) for e in active.get("events", [])) or "yok"}.
-
-{table(["Tarih", "Olay", "Kapanış", "Supertrend", "Ichimoku"], rec_rows, "llrll") if rec_rows else ""}
-
-{sr_md}
-
-## 9. Backtest
-
-{bt_md}
-
-## 10. Harness kararı
-
-Aynı soru 17 adımlı harness'tan geçirildi (senaryo planlayıcı + kural tabanlı açıklayıcı): **{res.explanation.action.value if res.explanation else "–"}**,
-risk kapısı **{res.gate.value}** ({len(res.gate_reasons)} bulgu; türler: {", ".join(gate_codes) or "yok"}).
-{len(res.calls)} araç çağrısı, {len(res.invalid_calls)} geçersiz. Aday etiketi (`TECHNICAL_REVERSAL_CANDIDATE`) için
-güncel olayın tarihsel ve backtest kanıtıyla desteklenmesi gerekir; bu koşul sağlanmadığında sistem izleme ile yetinir.
-
-## 11. Sınırlar ve hocanın betiğiyle farklar
-
-- Hocanın S3 betiğinde Supertrend son bantları NaN ATR ile tohumlandığından hiç başlamaz; bu yüzden betik Supertrend
-  dönüşü üretmez. Bizde özyineleme ilk geçerli ATR barından başlar (aynı başlangıçla betikle birebir, testli); bu
-  dönemde {by.get("SUPERTREND_BULLISH_FLIP", {}).get("n", 0)} yukarı ve {by.get("SUPERTREND_BEARISH_FLIP", {}).get("n", 0)} aşağı dönüş var.
-- Betikteki ileri getiri `dropna` ile eksik pencereleri sessizce atar; bizde eksik pencereler ayrı listelenir.
-- KAMA–fiyat kesişimi KAMA eğim dönüşüyle matematiksel olarak aynıdır; çift sayım ve çoklu test şişmesini önlemek için
-  ayrı olay sayılmadı.
-- Fiyat serisi temettü ve bedelsiz düzeltmelidir ve analiz tarihine çapalıdır; yfinance'teki kesik bar ve sahte satır
-  sorunları birincil kaynakta düzeltilmiştir (CLAUDE.md §11).
-- Tek hisse, tek dönem: sonuçlar başka hisselere ya da döneme genellenemez.
-
-## Ek — kaynak araç çağrıları
-
-{provenance(run, out.parent.parent)}
-"""
-    path = out / f"s3_teknik_donus_{ticker.lower()}.md"
-    path.write_text(md, encoding="utf-8")
-    return path
-
-
-# --------------------------------------------------------------------------------------------- shared (S1, S2, S4, ...)
-AS_OF = "2026-09-10"
-START = "2024-01-01"
-
-
-def pyplot() -> Any:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    return plt
+    return Run(qid, res, path)
 
 
 class Scan:
@@ -604,38 +287,161 @@ class Scan:
         if not self.calls:
             return ""
         rows = [[label, f"`{tool}`", f"`{env.call_id[:16]}`"] for label, tool, env in self.calls]
-        return "\n\n**Karşılaştırma için ek araç çağrıları** (harness dışı, aynı snapshot ve as_of)\n\n" + table(
-            ["Kapsam", "Araç", "call_id"], rows, "lll"
+        return (
+            "\n\n**Additional tool calls for comparison** (outside the harness run; same snapshot and as_of)\n\n"
+            + table(["Scope", "Tool", "call_id"], rows, "lll")
         )
 
 
-def sign_word(x: float, up: str = "önünde", down: str = "gerisinde") -> str:
-    return up if x >= 0 else down
-
-
-def decision_md(run: Run) -> str:
-    res = run.res
-    codes = sorted({g["code"] for g in res.gate_reasons})
+def provenance(run: Run, rel_root: Path, scan: Scan | None = None) -> str:
+    rows = [
+        [c.state.value, f"`{c.tool}`", c.origin, f"`{c.envelope.call_id[:16]}`" if c.envelope else "–"]
+        for c in run.res.calls
+    ]
+    dv: dict[str, str] = {}
+    for c in run.res.calls:
+        if c.envelope is not None:
+            dv.update(c.envelope.data_version)
     return (
-        f"Aynı soru 17 adımlı harness'tan geçirildi (senaryo planlayıcı + kural tabanlı açıklayıcı): "
-        f"**{res.explanation.action.value if res.explanation else '–'}**, risk kapısı **{res.gate.value}** "
-        f"({len(res.gate_reasons)} bulgu; türler: {', '.join(codes) or 'yok'}). {len(res.calls)} araç çağrısı, "
-        f"{len(res.invalid_calls)} geçersiz.\n\nSistemin açıklaması (kanıt numaraları E# ile):\n\n"
-        + "\n".join(
-            f"> {line}" if line.strip() else ">"
-            for line in (res.explanation.text_tr if res.explanation else "").splitlines()
-        )
+        f"Analysis `{run.res.analysis_id}` · decision `{run.res.decision_id}` · episodic record "
+        f"`{run.memory.relative_to(rel_root).as_posix()}` (replay: `python -m bistharness.harness replay --decision ...` "
+        "with that memory file, or the web UI).\n\nData version (sha256, first 12): "
+        + ", ".join(f"{k} `{str(v)[:12]}`" for k, v in sorted(dv.items()))
+        + "\n\n"
+        + table(["State", "Tool", "Origin", "call_id"], rows, "llll")
+        + (scan.appendix() if scan else "")
     )
 
 
 def header(code: str, title: str, run: Run) -> str:
     r = run.res.request
     return (
-        f"# {code} — {title}\n\n*FinTreX Analyst senaryo raporu · analiz tarihi {fmt.tr_date(r.as_of_date)} · dönem "
-        f"{fmt.tr_date(r.start)} – {fmt.tr_date(r.as_of_date)}. Bu rapor `eval/scenario_reports.py` ile araç çıktılarından "
-        "üretilmiştir; metindeki ve tablolardaki her sayı bir araç zarfından gelir (kaynak çağrılar ekte). Eğitsel bir "
-        "analizdir, yatırım tavsiyesi değildir.*\n\n"
+        f"# {code} — {title}\n\n*FinTreX Analyst research report · analysis date (as_of) {day(r.as_of_date)} · period "
+        f"{day(r.start)} to {day(r.as_of_date)}. Generated by `eval/scenario_reports.py` from tool outputs: every number "
+        "in the text and tables comes from a tool envelope (source calls in the appendix). Educational analysis, "
+        "not investment advice.*\n\n"
     )
+
+
+def question_md(run: Run, spec: str) -> str:
+    return (
+        f"## 1. Question\n\n> {QUESTION_EN[run.qid]}\n\n*(Instructor's golden question {run.qid}; the original Turkish "
+        f"wording is in `eval/golden_questions.json`.)*\n\n{spec}\n\n"
+    )
+
+
+def decision_md(run: Run) -> str:
+    res, e = run.res, run.res.explanation
+    codes = sorted({g["code"] for g in res.gate_reasons})
+    if e is None:
+        return "No explanation was produced."
+    first = e.attempts[0].validation.ok if e.attempts else None
+    return (
+        f"The same question was run through the 17-state harness (scenario planner + rule-based explainer). Final "
+        f"analytical state: **{e.action.value}**; risk gate **{res.gate.value}** ({len(res.gate_reasons)} findings; "
+        f"types: {', '.join(codes) or 'none'}). {len(res.calls)} tool calls, {len(res.invalid_calls)} invalid. The "
+        f"explanation cites {len(e.cited)} committed evidence items ({', '.join(e.cited)}) and "
+        f"{'passed' if first else 'did not pass'} the output validator on the first attempt"
+        f"{' (deterministic fallback used)' if e.fallback_used else ''}. The product writes its explanation in Turkish; "
+        "it is stored verbatim in the episodic record above and can be replayed byte for byte."
+    )
+
+
+def bt_rows(v: dict[str, Any], bench_label: str = "Equal-weight buy & hold") -> list[list[str]]:
+    m, t = v["metrics"], v["trades"]
+    rows = [
+        ["Period", f"{day(m['start'])} to {day(m['end'])}"],
+        ["Signals / closed trades", f"{integer(t['n_signals'])} / {integer(t['n_closed'])}"],
+        ["Win rate", pct(t["win_rate"], 1)],
+        ["Cumulative return (nominal)", pct(m["cumulative"], 2, True)],
+        ["Real return (CPI-deflated)", pct(v["real_cumulative"], 2, True)],
+        ["Difference vs XU100", pp(v["vs_xu100"])],
+        [f"Difference vs {bench_label.lower()}", pp(v["vs_buy_and_hold"])],
+        ["Sharpe (rf = 0 / policy rate)", f"{num(m['sharpe_rf0'])} / {num(m['sharpe_policy'])}"],
+        ["Maximum drawdown", pct(m["max_drawdown"], 2)],
+    ]
+    for lab, key in (("In sample", "in_sample"), ("Out of sample", "out_of_sample")):
+        b = v.get(key)
+        if b:
+            rows.append(
+                [
+                    f"{lab} ({day(b['start'])} to {day(b['end'])})",
+                    f"{pct(b['cumulative'], 2, True)}, Sharpe {num(b['sharpe_rf0'])}",
+                ]
+            )
+    return rows
+
+
+def backtest_md(run: Run, bench_label: str = "Equal-weight buy & hold") -> tuple[str, Any, Any]:
+    env = run.env("run_backtest", "RUN_BACKTEST")
+    if env is None:
+        return "No backtest output.", None, None
+    name, v = next(iter(env.result["variants"].items()))
+    spec = env.result["strategy_spec"]
+    md = (
+        f"Variant `{name}` ({VARIANT_EN.get(name, name)}) of the pre-registered rule `{spec['name']}` (fixed before any "
+        f"result was seen): entry events {', '.join(f'`{x}`' for x in spec['entry_events'])}; holding period "
+        f"{spec['holding_days']} trading days; signal at the close of day t, trade at the open of t+1; cost "
+        f"{num(env.result['costs']['tx_cost_bps'], 0)} bp per trade.\n\n"
+        + table(["Measure", "Value"], bt_rows(v, bench_label), "lr")
+    )
+    return md, name, v
+
+
+# --------------------------------------------------------------------------------------------- matplotlib
+def pyplot() -> Any:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    return plt
+
+
+def style(ax: Any) -> None:
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    for s in ("left", "bottom"):
+        ax.spines[s].set_color(INK)
+        ax.spines[s].set_linewidth(0.8)
+    ax.tick_params(colors=INK, labelsize=8.5)
+    ax.grid(axis="x", color="#e4e1d8", linewidth=0.6)
+    ax.set_axisbelow(True)
+
+
+def save(fig: Any, path: Path) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=180, bbox_inches="tight", facecolor=PAPER)
+    pyplot().close(fig)
+    return path.name
+
+
+def ci_dotplot(rows: list[tuple[str, float, tuple[float, float], float]], xlabel: str, path: Path) -> str:
+    """rows: (label, rate, (lo, hi), baseline) -> dot = rate, bar = 95% CI, tick = baseline."""
+    plt = pyplot()
+    fig, ax = plt.subplots(figsize=(8.2, 0.3 * len(rows) + 1.2))
+    for i, (_lab, rate, (lo, hi), base) in enumerate(rows):
+        ax.plot([lo * 100, hi * 100], [i, i], color="#c9c5ba", linewidth=3, solid_capstyle="round")
+        ax.scatter(base * 100, i, marker="|", s=120, color=INK, zorder=3)
+        ax.scatter(rate * 100, i, s=26, color=SIGNAL, zorder=4)
+    ax.set_yticks(range(len(rows)), [r[0] for r in rows], fontsize=8)
+    ax.set_xlabel(xlabel)
+    style(ax)
+    return save(fig, path)
+
+
+def equity_plot(eq: list[dict[str, Any]], path: Path, strategy_label: str, bh_label: str) -> str:
+    plt = pyplot()
+    x = [date.fromisoformat(str(p["date"])[:10]) for p in eq]
+    fig, ax = plt.subplots(figsize=(8.2, 3.6))
+    ax.plot(x, [p["buy_and_hold"] * 100 for p in eq], ":", color=MUTE, linewidth=1.2, label=bh_label)
+    ax.plot(x, [p["xu100"] * 100 for p in eq], color=INK, linewidth=1.1, label="XU100")
+    ax.plot(x, [p["strategy"] * 100 for p in eq], color=SIGNAL, linewidth=1.8, label=strategy_label)
+    ax.set_ylabel("cumulative return (%)")
+    ax.legend(fontsize=7.5, frameon=False)
+    style(ax)
+    ax.grid(axis="y", color="#e4e1d8", linewidth=0.6)
+    return save(fig, path)
 
 
 def write(out: Path, name: str, md: str) -> Path:
@@ -644,29 +450,350 @@ def write(out: Path, name: str, md: str) -> Path:
     return path
 
 
-def bt_rows(v: dict[str, Any]) -> list[list[str]]:
-    m, t = v["metrics"], v["trades"]
-    rows = [
-        ["Dönem", f"{fmt.tr_date(m['start'])} – {fmt.tr_date(m['end'])}"],
-        ["Sinyal / kapanan işlem", f"{fmt.integer(t['n_signals'])} / {fmt.integer(t['n_closed'])}"],
-        ["Kazanan oranı", pct(t["win_rate"], 1)],
-        ["Kümülatif getiri (nominal)", pct(m["cumulative"], 2, True)],
-        ["Reel getiri (TÜFE)", pct(v["real_cumulative"], 2, True)],
-        ["XU100'e göre fark", fmt.pp_from_fraction(v["vs_xu100"])],
-        ["Eşit ağırlıklı al-tut'a göre fark", fmt.pp_from_fraction(v["vs_buy_and_hold"])],
-        ["Sharpe (rf = 0 / politika faizi)", f"{fmt.num(m['sharpe_rf0'], 2)} / {fmt.num(m['sharpe_policy'], 2)}"],
-        ["En büyük düşüş", pct(m["max_drawdown"], 2)],
+# --------------------------------------------------------------------------------------------- S3
+def report_s3(out: Path) -> Path:
+    run = run_golden("Q3", out)
+    res = run.res
+    rev = run.env("detect_reversal_events")
+    r = rev.result
+    sr, ind = run.env("find_support_resistance"), run.env("calculate_indicators")
+    tk, h = r["ticker"], r["main_horizon"]
+    by = {s["event_type"]: s for s in r["summary"]}
+    figs = out / "fig"
+
+    def n_mark(n: int) -> str:
+        return f"{n}†" if n < 5 else (f"{n}*" if n < 10 else str(n))
+
+    fam_rows: dict[str, list[list[str]]] = {}
+    for s in r["summary"]:
+        fam_rows.setdefault(FAMILY_EN.get(s["family"], s["family"]), []).append(
+            [
+                event(s["event_type"]) + (" ↑" if s["direction"] == "bullish" else " ↓"),
+                n_mark(s["n"]),
+                f"{s['n_success']} / {s['n'] - s['n_success']}" if s["n"] else "–",
+                f"{pct(s['success_rate'], 1)} [{pct(s['success_rate_ci95'][0], 0)}–{pct(s['success_rate_ci95'][1], 0)}]"
+                if s["n"]
+                else "–",
+                pct(s["baseline_success_rate"], 1),
+                f"{pct(s['mean'], 2, True)} / {pct(s['median'], 2, True)}" if s["n"] else "–",
+                pct(s["mean_reversal_strength"], 2) if s["n"] else "–",
+                pp(s["mean_abnormal_vs_xu100"]) if s["n"] else "–",
+                pval(s.get("p_bh")),
+            ]
+        )
+    fam_md = "\n\n".join(
+        f"**{fam}**\n\n"
+        + table(
+            [
+                "Event",
+                "n",
+                "Success / failure",
+                f"Success ({h}d) [95% CI]",
+                "Non-event days",
+                "Mean / median",
+                "Reversal strength",
+                "vs XU100",
+                "p (BH)",
+            ],
+            rows,
+        )
+        for fam, rows in fam_rows.items()
+    )
+    base_ev = by["BB_LOWER_TOUCH"]
+    rsi_c, st_c = by.get("BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE"), by.get("BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD")
+    comb_rows = [
+        [
+            event(e),
+            str(by[e]["n"]),
+            pct(by[e]["success_rate"], 1),
+            pct(by[e]["mean"], 2, True),
+            pct(by[e]["median"], 2, True),
+            pct(by[e]["mean_reversal_strength"], 2),
+        ]
+        for e in ("BB_LOWER_TOUCH", "BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE", "BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD")
+        if e in by
     ]
-    for lab, key in (("Örneklem içi", "in_sample"), ("Örneklem dışı", "out_of_sample")):
-        b = v.get(key)
-        if b:
-            rows.append(
-                [
-                    f"{lab} ({fmt.tr_date(b['start'])} – {fmt.tr_date(b['end'])})",
-                    f"{pct(b['cumulative'], 2, True)}, Sharpe {fmt.num(b['sharpe_rf0'], 2)}",
+
+    def cmp(a: float, b: float) -> str:
+        return "higher" if a > b else "lower" if a < b else "equal"
+
+    comb_text = []
+    if rsi_c:
+        comb_text.append(
+            f"Adding the RSI-below-40 and rising-volume condition gives a success rate of {pct(rsi_c['success_rate'], 1)} "
+            f"({cmp(rsi_c['success_rate'], base_ev['success_rate'])} than the {pct(base_ev['success_rate'], 1)} of all lower "
+            f"touches), but the sample falls to {rsi_c['n']} events."
+        )
+    if st_c:
+        comb_text.append(
+            f"When the Supertrend is bearish and price is below the cloud the success rate is {pct(st_c['success_rate'], 1)} "
+            f"({cmp(st_c['success_rate'], base_ev['success_rate'])}; {st_c['n']} events). The specification's illustrative "
+            "scenario describes signals failing under this condition; in ASELS over this period the data "
+            + ("show the opposite" if st_c["success_rate"] >= base_ev["success_rate"] else "agree")
+            + f", although the difference is not significant after correction (p (BH) = {pval(st_c['p_bh'])})."
+        )
+    hz_rows = []
+    for e in (
+        "BB_LOWER_TOUCH",
+        "BB_LOWER_REVERSAL",
+        "BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE",
+        "BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD",
+        "RSI_TROUGH_VOLUME",
+        "SUPERTREND_BULLISH_FLIP",
+        "ICHIMOKU_BULLISH_BREAKOUT",
+        "SUPPORT_TOUCH",
+    ):
+        cells = {x["horizon"]: x for x in r["horizons"].get(e) or []}
+        if cells:
+            hz_rows.append(
+                [event(e)]
+                + [
+                    f"{pct(cells[k]['success_rate'], 0)} / {pct(cells[k]['mean'], 1, True)}"
+                    if k in cells and cells[k]["n"]
+                    else "–"
+                    for k in (1, 3, 5, 10, 20)
                 ]
             )
-    return rows
+    reg_rows = []
+    for e in (
+        "BB_LOWER_TOUCH",
+        "BB_LOWER_REVERSAL",
+        "RSI_TROUGH_VOLUME",
+        "SUPERTREND_BULLISH_FLIP",
+        "ICHIMOKU_BULLISH_BREAKOUT",
+    ):
+        b = r["breakdowns_main_horizon"].get(e) or {}
+        cells = []
+        for dim, states in (("market_trend", ("rising", "falling")), ("volatility", ("low", "high"))):
+            for stt in states:
+                c = (b.get(dim) or {}).get(stt)
+                cells.append(f"{pct(c['success_rate'], 0)} (n={c['n']})" if c and c["n"] else "–")
+        reg_rows.append([event(e), *cells])
+    tested = [s for s in r["summary"] if s["n"] and s.get("p_mean_vs_baseline") is not None]
+    raw = sum(1 for s in tested if s["p_mean_vs_baseline"] < 0.05)
+    bh = sum(1 for s in tested if (s.get("p_bh") or 1) < 0.05)
+    bon = sum(1 for s in tested if (s.get("p_bonferroni") or 1) < 0.05)
+    mt_text = (
+        "None of the differences that look significant one by one survives the correction: no event type separates "
+        "forward returns from non-event days with statistical confidence in this period. The high success rates partly "
+        f"reflect ASELS' strong overall uptrend (non-event days rose {pct(base_ev['baseline_success_rate'], 1)} of the time)."
+        if bh == 0
+        else f"{bh} event types remain significant after correction."
+    )
+    st = ind.result["state"] if ind else {}
+    trend = (
+        f"As of {day(r['end'])}: Supertrend {STATE_EN.get(st.get('supertrend_state'), st.get('supertrend_state'))}, price "
+        f"{STATE_EN.get(st.get('ichimoku_state'), st.get('ichimoku_state'))}, KAMA slope "
+        f"{STATE_EN.get(st.get('kama_slope_state'), st.get('kama_slope_state'))}, RSI {num(st.get('rsi'), 1)}."
+        if st
+        else ""
+    )
+    active = r.get("active_now") or {}
+    rec_rows = [
+        [
+            day(e["event_date"]),
+            event(e["event_type"]),
+            num(e["close"]),
+            STATE_EN.get(e.get("supertrend_state"), str(e.get("supertrend_state"))),
+            STATE_EN.get(e.get("ichimoku_state"), str(e.get("ichimoku_state"))),
+        ]
+        for e in (r.get("recent_events") or [])[-8:]
+    ]
+    sr_rows = []
+    if sr:
+        for lv in sr.result["levels"]:
+            sr_rows.append(
+                [
+                    lv["side"],
+                    num(lv["price"]),
+                    str(lv["touches"]),
+                    day(lv["last_touch"]),
+                    day(lv["known_from"]),
+                    pct(lv["distance"], 2, True),
+                ]
+            )
+    bt_text, _name, bt = backtest_md(run, f"{tk} buy & hold")
+    bt_read = ""
+    fig_eq = ""
+    if bt:
+        oos = bt.get("out_of_sample")
+        bt_read = (
+            f"The strategy finished {pp(bt['vs_xu100'])} versus XU100 but {pp(bt['vs_buy_and_hold'])} versus simply holding "
+            f"{tk}: short (5-day) reversal trades miss most of a strong trend."
+            + (f" Out of sample the return was {pct(oos['cumulative'], 2, True)}." if oos else "")
+        )
+        if bt.get("equity"):
+            fig_eq = equity_plot(bt["equity"], figs / "s3_backtest.png", "Strategy (A_TECH)", f"{tk} buy & hold")
+    rows = [s for s in r["summary"] if s["n"] >= 5]
+    rows.sort(key=lambda s: (s["success_rate"] or 0) - (s["baseline_success_rate"] or 0))
+    fig_ci = ci_dotplot(
+        [
+            (
+                f"{event(s['event_type'])} (n={s['n']})",
+                s["success_rate"],
+                tuple(s["success_rate_ci95"]),
+                s["baseline_success_rate"],
+            )
+            for s in rows
+        ],
+        f"{h}-day success rate (%) — dot: event, bar: 95% CI, tick: non-event days",
+        figs / "s3_success_rates.png",
+    )
+    plt = pyplot()
+    fig, ax = plt.subplots(figsize=(8.2, 3.8))
+    hs: list[dict[str, Any]] = []
+    for e, color, ls in (
+        ("BB_LOWER_TOUCH", INK, "-"),
+        ("BB_LOWER_TOUCH+RSI_LOW+VOLUME_RISE", SIGNAL, "-"),
+        ("BB_LOWER_TOUCH+ST_BEARISH+BELOW_CLOUD", MUTE, "--"),
+    ):
+        hs = r["horizons"].get(e) or []
+        ax.plot(
+            [x["horizon"] for x in hs],
+            [x["success_rate"] * 100 for x in hs],
+            ls,
+            color=color,
+            marker="o",
+            markersize=4,
+            label=event(e),
+        )
+    if hs:
+        ax.plot(
+            [x["horizon"] for x in hs],
+            [x["baseline_success_rate"] * 100 for x in hs],
+            ":",
+            color="#b5b1a6",
+            label="non-event days",
+        )
+    ax.set_xlabel("horizon (trading days)")
+    ax.set_ylabel("success rate (%)")
+    ax.legend(fontsize=7, frameon=False, loc="lower right")
+    style(ax)
+    ax.grid(axis="y", color="#e4e1d8", linewidth=0.6)
+    fig_hz = save(fig, figs / "s3_horizon_profile.png")
+    findings = [
+        f"Lower Bollinger touches occurred {base_ev['n']} times; {base_ev['n_success']} were followed by a higher price "
+        f"after {h} days ({pct(base_ev['success_rate'], 1)}; non-event days {pct(base_ev['baseline_success_rate'], 1)}).",
+    ]
+    if st_c:
+        findings.append(
+            f"Touches with a bearish Supertrend and price below the cloud ({st_c['n']} events) were historically stronger: "
+            f"{pct(st_c['success_rate'], 1)} success, mean {pct(st_c['mean'], 2, True)}."
+        )
+    findings.append(f"After multiple-testing correction {bh} of {r['family_size']} event types are significant.")
+    if bt:
+        findings.append(
+            f"The pre-registered reversal strategy returned {pct(bt['metrics']['cumulative'], 2, True)}: {pp(bt['vs_xu100'])} "
+            f"versus XU100 but {pp(bt['vs_buy_and_hold'])} versus holding {tk}."
+        )
+    if res.explanation:
+        findings.append(f"Harness decision: {res.explanation.action.value} (risk gate {res.gate.value}).")
+    md = (
+        header("S3", f"Technical reversal events: {tk}", run)
+        + f"""## Key findings
+
+{bullets(findings)}
+
+"""
+        + question_md(
+            run,
+            "Specification §13: how price behaved after lower Bollinger touches and other technical events, "
+            "single-indicator events versus combined conditions, and results by market regime.",
+        )
+        + f"""## 2. Method
+
+- **Event date = confirmation date.** An RSI local trough forms at t−1 and is confirmed at t, so the event is dated t.
+  A support/resistance level is known from the day its pivot is confirmed. The Ichimoku Chikou span is not used.
+- **Success:** forward {h}-day return > 0 for bullish events, < 0 for bearish events. Main horizon {h} trading days;
+  1, 3, 5, 10 and 20 days are also reported.
+- **Benchmark:** the same horizon on non-event days (baseline rate). Reversal strength = best directional move inside
+  the window (maximum favourable excursion). Abnormal return = stock return − XU100 return.
+- **Point in time:** only data known at the close of {day(res.request.as_of_date)}. **{len(rev.excluded_incomplete_events)}
+  event-horizon pairs** whose forward window was not complete by then are excluded and listed in the tool output
+  (`excluded_incomplete_events`) instead of being silently dropped.
+- **Multiple testing:** {r["family_size"]} event types tested in one call; Welch p-values of the event vs non-event mean
+  difference are adjusted with Bonferroni and Benjamini–Hochberg.
+- Indicator parameters equal the instructor's reference scripts (BB 20/2σ, RSI 14 Wilder, KAMA 10/2/30, ATR 10,
+  Supertrend 10/3, Ichimoku 9/26/52, volume MA20), verified by parity tests.
+
+## 3. Event families
+
+Columns: successes / failures; {h}-day success rate with 95% CI; rate on non-event days; {h}-day mean / median return;
+mean reversal strength; mean abnormal return vs XU100; Benjamini–Hochberg p. ↑ bullish, ↓ bearish hypothesis.
+† n < 5 (insufficient sample), * n < 10 (small sample).
+
+{fam_md}
+
+![Success rates and confidence intervals](fig/{fig_ci})
+
+## 4. Single indicator versus combined conditions
+
+{table(["Condition", "n", f"Success ({h}d)", "Mean", "Median", "Reversal strength"], comb_rows)}
+
+{" ".join(comb_text)}
+
+## 5. Horizon profile
+
+Cell: success rate / mean return.
+
+{table(["Event", "1d", "3d", "5d", "10d", "20d"], hz_rows)}
+
+![Horizon profile](fig/{fig_hz})
+
+## 6. By market regime ({h}-day success)
+
+{table(["Event", "XU100 rising", "XU100 falling", "Low volatility", "High volatility"], reg_rows)}
+
+Regime subsets are small and are not a basis for a decision on their own.
+
+## 7. Multiple-testing risk
+
+Of {len(tested)} event types, {raw} have a raw p < 0.05 for the event vs non-event mean difference; {bh} after
+Benjamini–Hochberg and {bon} after Bonferroni. {mt_text}
+
+## 8. State as of {day(res.request.as_of_date)}
+
+{trend} Events active in the last {active.get("window_trading_days", 5)} trading days (since {day(active.get("from"))}):
+{", ".join(event(e) for e in active.get("events", [])) or "none"}.
+
+{table(["Date", "Event", "Close", "Supertrend", "Ichimoku"], rec_rows, "llrll") if rec_rows else ""}
+
+**Support and resistance levels** (pivots of the last 250 bars clustered within 2%, at least two touches)
+
+{table(["Side", "Level", "Touches", "Last touch", "Known from", "Distance from close"], sr_rows, "lrrllr") if sr_rows else "None."}
+
+## 9. Backtest
+
+{bt_text}
+
+{f"![Backtest equity curve](fig/{fig_eq})" if fig_eq else ""}
+
+{bt_read}
+
+## 10. Harness decision
+
+{decision_md(run)} A `TECHNICAL_REVERSAL_CANDIDATE` label requires the current event to be supported by historical and
+backtest evidence; when that is not the case the system stays with monitoring.
+
+## 11. Limitations and differences from the instructor's script
+
+- In the instructor's S3 script the Supertrend final bands are seeded with a NaN ATR, so the Supertrend never starts
+  and the script produces no Supertrend flips. Here the recursion starts at the first valid ATR bar (identical to the
+  script's recursion from that start, tested); this period has {by.get("SUPERTREND_BULLISH_FLIP", {}).get("n", 0)} bullish
+  and {by.get("SUPERTREND_BEARISH_FLIP", {}).get("n", 0)} bearish flips.
+- The script's forward returns use `dropna`, silently dropping incomplete windows; here they are listed separately.
+- A KAMA–price cross is mathematically the same as a KAMA slope turn; it is not counted as a separate event (to avoid
+  double counting and inflating the multiple-testing family).
+- Prices are dividend- and split-adjusted and anchored to the analysis date; truncated bars and spurious rows found in
+  yfinance are corrected in the primary source.
+- One stock, one period: results do not generalise to other stocks or periods.
+
+## Appendix — source tool calls
+
+{provenance(run, out.parent.parent)}
+"""
+    )
+    return write(out, f"s3_technical_reversal_{tk.lower()}.md", md)
 
 
 # --------------------------------------------------------------------------------------------- S1
@@ -674,16 +801,16 @@ def report_s1(out: Path) -> Path:
     run = run_golden("Q1", out)
     scan = Scan()
     sec = run.env("rank_sector_relative_strength").result
-    figdir = out / "fig"
+    figs = out / "fig"
     members = sec["members_with_data"]
     rank_rows = [
         [
             x["ticker"],
             pct(x["ret"], 2, True),
             pct(x["peer_median"], 2, True),
-            fmt.pp_from_fraction(x["lag_score"]),
+            pp(x["lag_score"]),
             f"{x['rank']}/{len(members)}",
-            fmt.pp_from_fraction(x["rel_benchmark"]),
+            pp(x["rel_benchmark"]),
         ]
         for x in sec["ranking"]
     ]
@@ -691,63 +818,58 @@ def report_s1(out: Path) -> Path:
     win_rows = []
     for t in members:
         cells = {w["window"]: w for w in sec["all_windows"] if w["ticker"] == t}
-        win_rows.append([t] + [fmt.pp_from_fraction(cells[w]["lag_score"]) if w in cells else "–" for w in windows])
+        win_rows.append([t] + [pp(cells[w]["lag_score"]) if w in cells else "–" for w in windows])
     gm_rows = [
         [
-            f"{w}g",
+            f"{w}d",
             pct(sec["group_median"][str(w)], 2, True),
             pct(sec["benchmark_returns"][str(w)], 2, True),
-            "güçlü" if sec["strong"][str(w)] else "güçlü değil",
+            "strong" if sec["strong"][str(w)] else "not strong",
         ]
         for w in windows
     ]
     cu = sec["catch_up"]
     cu_rows = [
         [
-            f"{x['horizon']}g",
+            f"{x['horizon']}d",
             str(x["n"]),
             str(x["n_catch_up"]),
             str(x["n_false_positive"]),
             f"{pct(x['hit_rate'], 1)} [{pct(x['hit_rate_ci95'][0], 0)}–{pct(x['hit_rate_ci95'][1], 0)}]",
             pct(x["baseline_hit_rate"], 1),
-            fmt.pp_from_fraction(x["median_relative"]),
-            fmt.num(x["p_rate_vs_baseline"], 3),
+            pp(x["median_relative"]),
+            pval(x["p_rate_vs_baseline"]),
         ]
         for x in cu["horizons"]
     ]
     fp_rows = [
         [
-            fmt.tr_date(f["event_date"]),
+            day(f["event_date"]),
             f["ticker"],
-            fmt.pp_from_fraction(f["lag_score"]),
-            fmt.pp_from_fraction(f["rel_5d"]) if f.get("rel_5d") is not None else "–",
-            fmt.pp_from_fraction(f["rel_10d"]) if f.get("rel_10d") is not None else "–",
-            fmt.pp_from_fraction(f["rel_20d"]) if f.get("rel_20d") is not None else "–",
+            pp(f["lag_score"]),
+            pp(f.get("rel_5d")),
+            pp(f.get("rel_10d")),
+            pp(f.get("rel_20d")),
         ]
         for f in cu["false_positives"][-8:]
     ]
-    # structural vs temporary: fundamentals of the laggards from the same harness run
     fund_rows = []
-    for c in run.res.calls:
-        if c.tool == "calculate_fundamental_change" and c.envelope is not None:
-            rr = c.envelope.result
-            last = (rr.get("reports") or [None])[-1]
-            if last:
-                ch = last.get("ratio_changes", {})
-                em, nm = ch.get("ebitda_margin"), ch.get("net_margin")
-                fund_rows.append(
-                    [
-                        rr["ticker"],
-                        last["fiscal_period"].replace("Q", "Ç"),
-                        fmt.tr_datetime(last["disclosure_datetime"]),
-                        f"{pct(em['old'], 2)} → {pct(em['new'], 2)}" if em else "şablona uygun değil",
-                        f"{pct(nm['old'], 2)} → {pct(nm['new'], 2)}" if nm else "–",
-                        pct(last["yoy_ytd"].get("revenue"), 1, True) if last.get("yoy_ytd") else "–",
-                    ]
-                )
-    # every sector of the course universe
-    from bistharness.core.config import load_universe
-
+    for env in run.envs("calculate_fundamental_change"):
+        rr = env.result
+        last = (rr.get("reports") or [None])[-1]
+        if last:
+            ch = last.get("ratio_changes", {})
+            em, nm = ch.get("ebitda_margin"), ch.get("net_margin")
+            fund_rows.append(
+                [
+                    rr["ticker"],
+                    last["fiscal_period"],
+                    stamp(last["disclosure_datetime"]),
+                    f"{pct(em['old'])} → {pct(em['new'])}" if em else "n/a for template",
+                    f"{pct(nm['old'])} → {pct(nm['new'])}" if nm else "–",
+                    pct((last.get("yoy_ytd") or {}).get("revenue"), 1, True),
+                ]
+            )
     u = load_universe()
     groups: list[str] = []
     for t in u.tickers():
@@ -756,223 +878,199 @@ def report_s1(out: Path) -> Path:
             groups.append(g)
     cross = []
     for g in groups:
-        env = scan(g, "rank_sector_relative_strength", {"sector_or_tickers": g, "start": START, "horizon": 20})
+        env = scan(sector(g), "rank_sector_relative_strength", {"sector_or_tickers": g, "start": START, "horizon": 20})
         h20 = next((x for x in env.result["catch_up"]["horizons"] if x["horizon"] == 20), None)
         if h20 and h20["n"]:
             cross.append((g, env.result, h20))
     cross_rows = [
         [
-            g.replace("_", " "),
+            sector(g),
             str(len(r["members_with_data"])),
             str(h["n"]),
             pct(h["hit_rate"], 1),
             pct(h["baseline_hit_rate"], 1),
             str(h["n_false_positive"]),
-            fmt.pp_from_fraction(h["median_relative"]),
-            fmt.num(h["p_rate_vs_baseline"], 3),
+            pp(h["median_relative"]),
+            pval(h["p_rate_vs_baseline"]),
         ]
         for g, r, h in cross
     ]
     beats = sum(1 for _, _, h in cross if h["hit_rate"] > h["baseline_hit_rate"])
     signif = sum(1 for _, _, h in cross if h["p_rate_vs_baseline"] < 0.05)
-    plt = pyplot()
-    fig, ax = plt.subplots(figsize=(8.2, 0.34 * len(cross) + 1.2))
-    for i, (_g, _r, h) in enumerate(cross):
-        lo, hi = h["hit_rate_ci95"]
-        ax.plot([lo * 100, hi * 100], [i, i], color="#c9c5ba", linewidth=3, solid_capstyle="round")
-        ax.scatter(h["baseline_hit_rate"] * 100, i, marker="|", s=120, color=INK, zorder=3)
-        ax.scatter(h["hit_rate"] * 100, i, s=26, color=SIGNAL, zorder=4)
-    ax.set_yticks(range(len(cross)), [f"{g.replace('_', ' ')} (n={h['n']})" for g, _r, h in cross], fontsize=8)
-    ax.set_xlabel("20 günde akran sepetini geçme oranı (%) — nokta: geride kalanlar, dikey: geride kalmayan günler")
-    style(ax)
-    fig_cross = save(fig, figdir / "s1_sektorler.png")
-    bt_env = run.env("run_backtest", "RUN_BACKTEST")
-    variant = next(iter(bt_env.result["variants"])) if bt_env else None
-    bt = bt_env.result["variants"][variant] if bt_env else None
+    fig_cross = ci_dotplot(
+        [
+            (f"{sector(g)} (n={h['n']})", h["hit_rate"], tuple(h["hit_rate_ci95"]), h["baseline_hit_rate"])
+            for g, _r, h in cross
+        ],
+        "20-day catch-up rate (%) — dot: laggards, bar: 95% CI, tick: non-lagging days",
+        figs / "s1_sectors.png",
+    )
+    bt_text, name, bt = backtest_md(run)
     h20 = next((x for x in cu["horizons"] if x["horizon"] == 20), cu["horizons"][-1])
+    hz = str(sec["horizon"])
     findings = [
-        f"{sec['group'].replace('_', ' ')} sektörünün son {sec['horizon']} işlem günü medyan getirisi "
-        f"{pct(sec['group_median'][str(sec['horizon'])], 2, True)}, XU100 {pct(sec['benchmark_returns'][str(sec['horizon'])], 2, True)}: "
-        f"sektör {'güçlü' if sec['strong'][str(sec['horizon'])] else 'güçlü değil'}. Geride kalanlar: {', '.join(sec['laggards']) or 'yok'}; "
-        f"önde olanlar: {', '.join(sec['leaders']) or 'yok'}.",
-        f"Uzun pencerelerde de geride kalan (yapısal aday): {', '.join(sec['persistent_laggards']) or 'yok'}.",
-        f"{fmt.tr_date(cu['start'])}–{fmt.tr_date(cu['end'])} arasında {cu['n_events']} geride kalma girişinin 20 günlük "
-        f"yetişme oranı {pct(h20['hit_rate'], 1)}, geride kalmayan günlerde {pct(h20['baseline_hit_rate'], 1)}; "
-        f"{h20['n_false_positive']} yanlış pozitif.",
-        f"{len(cross)} sektörün {beats} tanesinde geride kalanların 20 günlük yetişme oranı baz orandan yüksek, "
-        f"{signif} tanesinde fark istatistiksel olarak anlamlı (p < 0,05).",
+        f"Over the last {hz} trading days the {sector(sec['group'])} sector median returned {pct(sec['group_median'][hz], 2, True)} "
+        f"versus {pct(sec['benchmark_returns'][hz], 2, True)} for XU100: the sector is {'strong' if sec['strong'][hz] else 'not strong'}. "
+        f"Laggards: {', '.join(sec['laggards']) or 'none'}; leaders: {', '.join(sec['leaders']) or 'none'}.",
+        f"Lagging also over longer windows (structural candidates): {', '.join(sec['persistent_laggards']) or 'none'}.",
+        f"Between {day(cu['start'])} and {day(cu['end'])}, {cu['n_events']} laggard entries had a 20-day catch-up rate of "
+        f"{pct(h20['hit_rate'], 1)} versus {pct(h20['baseline_hit_rate'], 1)} on non-lagging days; {h20['n_false_positive']} false positives.",
+        f"Across {len(cross)} sectors the laggards' 20-day catch-up rate beats the baseline in {beats}, and the difference is "
+        f"significant (p < 0.05) in {signif}.",
     ]
     if bt:
         findings.append(
-            f"`{variant}` backtest'i {pct(bt['metrics']['cumulative'], 2, True)}; XU100'ün "
-            f"{fmt.pp_from_fraction(abs(bt['vs_xu100']))} {sign_word(bt['vs_xu100'])}."
+            f"Backtest `{name}`: {pct(bt['metrics']['cumulative'], 2, True)}, {pp(bt['vs_xu100'])} versus XU100."
         )
     md = (
-        header("S1", f"Sektörde geride kalma ve yetişme: {sec['group'].replace('_', ' ')}", run)
-        + f"""## Ana bulgular
+        header("S1", f"Sector laggards and catch-up: {sector(sec['group'])}", run)
+        + f"""## Key findings
 
-{chr(10).join("- " + f for f in findings)}
+{bullets(findings)}
 
-## 1. Soru
+"""
+        + question_md(
+            run,
+            "Specification §11: do stocks that lag a strong sector later catch up with it; is the lag "
+            "structural or temporary; how many false positives are there.",
+        )
+        + f"""## 2. Method
 
-> {run.res.request.question}
+- **Peer group:** the TÜBİTAK 95-stock sector map (`config/universe.yaml: peer_groups`). The whole sector of each
+  requested stock is used, not only the stocks named in the question ({", ".join(sec["members"])}).
+- **Lag score:** stock return − median return of the OTHER members (leave-one-out). Threshold {pp(sec["lag_threshold"])}.
+- **Strong sector:** group median > 0 and > XU100 over the same window.
+- **Event:** ENTRY into the laggard state in a strong sector (one event per episode, not every day).
+- **Catch-up:** stock return − equal-weight basket of the other members > 0 over the next h days; otherwise a false
+  positive. Benchmark: the same rate on non-lagging days. Events without a complete forward window are excluded.
 
-Şartname §11: güçlü bir sektörde belirgin biçimde geride kalan hisselerin daha sonra sektörünü yakalayıp
-yakalamadığı; geride kalmanın yapısal mı geçici mi olduğu; yanlış pozitifler.
+## 3. Current ranking ({day(sec["date"])}, last {hz} trading days)
 
-## 2. Yöntem
+{table(["Stock", "Return", "Median of other members", "Lag score", "Rank", "vs XU100"], rank_rows)}
 
-- **Akran grubu:** TÜBİTAK 95 hisse sektör haritası (`config/universe.yaml: peer_groups`). Soruda adı geçen hisseler
-  yerine hissenin bütün sektörü kullanılır ({", ".join(sec["members"])}).
-- **Geride kalma skoru:** {sec["definitions"]["lag_score"].replace("stock return - median return of the OTHER members over the window", "hisse getirisi − DİĞER üyelerin medyan getirisi (kendisi hariç)")}.
-  Eşik {fmt.pp_from_fraction(sec["lag_threshold"])}.
-- **Güçlü sektör:** grup medyanı > 0 ve > XU100 (aynı pencerede).
-- **Olay:** güçlü sektörde geride kalma durumuna GİRİŞ (her epizotta bir olay; her gün sayılmaz).
-- **Yetişme:** sonraki h günde hisse getirisi − diğer üyelerin eşit ağırlıklı sepeti > 0. Tersi = yanlış pozitif.
-  Kıyas: geride kalmayan günlerin aynı oranı. İleri penceresi dolmayan olaylar alınmaz.
+**Lag score over several windows**
 
-## 3. Bugünkü sıralama ({fmt.tr_date(sec["date"])}, son {sec["horizon"]} işlem günü)
+{table(["Stock", *[f"{w}d" for w in windows]], win_rows)}
 
-{table(["Hisse", "Getiri", "Diğer üyelerin medyanı", "Geride kalma skoru", "Sıra", "XU100'e göre"], rank_rows)}
+**Sector strength**
 
-**Farklı pencerelerde geride kalma skoru**
+{table(["Window", "Group median", "XU100", "State"], gm_rows, "lrrl")}
 
-{table(["Hisse", *[f"{w}g" for w in windows]], win_rows)}
+## 4. Do laggards historically catch up?
 
-**Sektör gücü**
+{table(["Horizon", "n", "Caught up", "False positives", "Rate [95% CI]", "Non-lagging days", "Median relative", "p"], cu_rows)}
 
-{table(["Pencere", "Grup medyanı", "XU100", "Durum"], gm_rows, "lrrl")}
+**Most recent false positives** (the lagging stock kept underperforming the basket)
 
-## 4. Geride kalanlar tarihsel olarak yetişiyor mu?
+{table(["Date", "Stock", "Lag score", "5d relative", "10d relative", "20d relative"], fp_rows, "llrrrr") if fp_rows else "None."}
 
-{table(["Ufuk", "n", "Yetişti", "Yanlış pozitif", "Oran [%95 GA]", "Geride kalmayan günler", "Medyan göreli", "p"], cu_rows)}
+## 5. Structural or temporary?
 
-**Son yanlış pozitifler** (geride kalan hisse sonra da sepetin gerisinde kaldı)
+Stocks lagging over longer windows too: **{", ".join(sec["persistent_laggards"]) or "none"}**. Latest reports (from the
+same harness run; only reports disclosed by {day(run.res.request.as_of_date)}):
 
-{table(["Tarih", "Hisse", "Geride kalma", "5g göreli", "10g göreli", "20g göreli"], fp_rows) if fp_rows else "Yok."}
+{table(["Stock", "Period", "Disclosed", "EBITDA margin", "Net margin", "Revenue (YoY, YTD)"], fund_rows, "lllrrr") if fund_rows else "No fundamentals."}
 
-## 5. Yapısal mı, geçici mi?
+A lag in a stock whose margins fell suggests the price reflects a fundamental deterioration (structural candidate); a
+lag in a stock with improving margins may be temporary. The split is not conclusive, which is why the system only
+gives a candidate label with backtest evidence.
 
-Uzun pencerelerde de geride kalan hisseler: **{", ".join(sec["persistent_laggards"]) or "yok"}**. Son bilançolar
-(aynı harness koşusundan, yalnız {fmt.tr_date(run.res.request.as_of_date)} itibarıyla açıklanmış olanlar):
+## 6. All sectors
 
-{table(["Hisse", "Dönem", "Açıklama", "FAVÖK marjı", "Net kâr marjı", "Hasılat (yıllık, YTD)"], fund_rows, "lllrrr") if fund_rows else "Bilanço verisi yok."}
+The same study for every sector of the 30-stock course universe (20-day horizon):
 
-Marjları düşen bir hissedeki geride kalma, fiyatın temel bir bozulmayı yansıttığını düşündürür (yapısal aday);
-marjları iyileşen bir hissedeki geride kalma geçici olabilir. Bu ayrım kesin değildir; sistem bu yüzden aday etiketini
-ancak backtest kanıtıyla verir.
+{table(["Sector", "Members", "Events", "Catch-up", "Baseline", "False positives", "Median relative", "p"], cross_rows)}
 
-## 6. Bütün sektörler
+![Catch-up rate by sector](fig/{fig_cross})
 
-Aynı çalışma 30 hisselik ders evrenindeki her sektör için tekrarlandı (20 günlük ufuk):
-
-{table(["Sektör", "Üye", "Olay", "Yetişme", "Baz", "Yanlış pozitif", "Medyan göreli", "p"], cross_rows)}
-
-![Sektörlere göre yetişme oranı](fig/{fig_cross})
-
-{len(cross)} sektörün {beats} tanesinde geride kalanların yetişme oranı baz orandan yüksek; {signif} tanesinde fark
-p < 0,05. Sektör sayısı kadar test yapıldığı için tek tek anlamlı görünen sonuçlar da çoklu test riskini taşır.
+The laggards' catch-up rate beats the baseline in {beats} of {len(cross)} sectors; the difference has p < 0.05 in
+{signif}. With one test per sector, individually significant results also carry multiple-testing risk.
 
 ## 7. Backtest
 
-{("`" + variant + "` varyantı (" + VARIANT_TR.get(variant, variant) + "), önceden sabitlenmiş kural:" + chr(10) + chr(10) + table(["Ölçüt", "Değer"], bt_rows(bt), "lr")) if bt else "Backtest çıktısı yok."}
+{bt_text}
 
-## 8. Harness kararı
+## 8. Harness decision
 
 {decision_md(run)}
 
-## 9. Sınırlar
+## 9. Limitations
 
-- Sektör grupları küçük (2–10 üye); medyan birkaç hissenin hareketine duyarlı.
-- Geride kalma epizotları bağımsız değildir (aynı sektör, aynı günler); güven aralıkları iyimser olabilir.
-- Temel ayrım yalnız son raporların marjlarına bakar; TMS 29 dönemleri arasında karşılaştırma uyarılıdır.
+- Sector groups are small (2–10 members); the median is sensitive to a few stocks.
+- Laggard episodes are not independent (same sector, same days); confidence intervals may be optimistic.
+- The structural/temporary split only looks at the latest margins; comparisons across TMS 29 periods carry warnings.
 
-## Ek — kaynak araç çağrıları
+## Appendix — source tool calls
 
-{provenance(run, out.parent.parent)}{scan.appendix()}
+{provenance(run, out.parent.parent, scan)}
 """
     )
-    return write(out, f"s1_sektor_yetisme_{sec['group'].lower()}.md", md)
+    return write(out, f"s1_sector_catch_up_{sector(sec['group']).lower().replace(' & ', '_').replace(' ', '_')}.md", md)
 
 
 # --------------------------------------------------------------------------------------------- S2
-DAYS_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
+def pattern_en(p: dict[str, Any]) -> str:
+    cond = ", ".join(f"{DAY_EN.get(d, d)} {'up' if s > 0 else 'down'}" for d, s in p["condition"])
+    return f"[{cond}] → {'–'.join(DAY_EN.get(d, d) for d in p['outcome'])} return"
 
 
 def report_s2(out: Path) -> Path:
     run = run_golden("Q2", out)
     scan = Scan()
-    env = run.env("test_weekday_pattern")
-    r = env.result
-    tk = r["ticker"]
-    p = r["pattern"]
-    per = r["periods"]
+    r = run.env("test_weekday_pattern").result
+    tk, p, per, st = r["ticker"], r["pattern"], r["periods"], r["stability"]
+    label = pattern_en(p)
 
     def prow(lab: str, k: str) -> list[str]:
         x = per[k]
-        c, u, cm = x["conditional"], x["unconditional"], x["complement"]
+        c, un, cm = x["conditional"], x["unconditional"], x["complement"]
         return [
             lab,
-            f"{fmt.tr_date(x['start'])} – {fmt.tr_date(x['end'])}",
+            f"{day(x['start'])} to {day(x['end'])}",
             str(x["complete_weeks"]),
             str(x["condition_weeks"]),
             pct(x["condition_frequency"], 1),
             f"{pct(c['mean'], 2, True)} / {pct(c['median'], 2, True)}",
             pct(c["mean_after_cost"], 2, True),
             pct(c["positive_rate"], 1),
-            f"{pct(u['mean'], 2, True)} / {pct(u['positive_rate'], 1)}",
-            f"{pct(cm['mean'], 2, True)}",
+            f"{pct(un['mean'], 2, True)} / {pct(un['positive_rate'], 1)}",
+            pct(cm["mean"], 2, True),
         ]
 
-    pat_rows = [prow("Örneklem içi", "in_sample"), prow("Örneklem dışı", "out_of_sample")]
     test_rows = []
-    for lab, k in (("Örneklem içi", "in_sample"), ("Örneklem dışı", "out_of_sample")):
+    for lab, k in (("In sample", "in_sample"), ("Out of sample", "out_of_sample")):
         x = per[k]
+        ci = x.get("bootstrap_mean_ci95")
         test_rows.append(
             [
                 lab,
-                fmt.pp_from_fraction(x["mean_difference"]) if x.get("mean_difference") is not None else "–",
-                fmt.num(x["p_welch_vs_complement"], 3) if x.get("p_welch_vs_complement") is not None else "–",
-                fmt.num(x["p_binomial_vs_unconditional"], 3)
-                if x.get("p_binomial_vs_unconditional") is not None
-                else "–",
-                fmt.num(x["p_permutation_vs_complement"], 3)
-                if x.get("p_permutation_vs_complement") is not None
-                else "–",
-                (
-                    f"{pct(x['bootstrap_mean_ci95'][0], 2, True)} – {pct(x['bootstrap_mean_ci95'][1], 2, True)}"
-                    if x.get("bootstrap_mean_ci95")
-                    else "–"
-                ),
+                pp(x.get("mean_difference")),
+                pval(x.get("p_welch_vs_complement")),
+                pval(x.get("p_binomial_vs_unconditional")),
+                pval(x.get("p_permutation_vs_complement")),
+                f"{pct(ci[0], 2, True)} to {pct(ci[1], 2, True)}" if ci else "–",
                 f"{x.get('family_rank', '–')}/{x.get('family_size', '–')}",
-                fmt.num(x["p_bh"], 3) if x.get("p_bh") is not None else "–",
-                f"{x.get('full_sequence_count', '–')} ({pct(x['full_sequence_frequency'], 1) if x.get('full_sequence_frequency') is not None else '–'})",
+                pval(x.get("p_bh")),
+                f"{x.get('full_sequence_count', '–')} ({pct(x.get('full_sequence_frequency'), 1)})",
             ]
         )
     wd = r["weekday_statistics"]
     wd_rows = []
-    for i, day in enumerate(DAYS_TR):
-        cells = [day]
+    for i, dname in enumerate(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]):
+        cells = [dname]
         for k in ("in_sample", "out_of_sample"):
             d = wd[k][i] if i < len(wd.get(k, [])) else None
-            cells += (
-                [f"{pct(d['mean'], 2, True)} / {pct(d['positive_rate'], 0)}", fmt.num(d["p_bh"], 3)]
-                if d
-                else ["–", "–"]
-            )
+            cells += [f"{pct(d['mean'], 2, True)} / {pct(d['positive_rate'], 0)}", pval(d["p_bh"])] if d else ["–", "–"]
         wd_rows.append(cells)
     eff = r["weekday_effect_tests"]
-    st = r["stability"]
-    weeks = per["in_sample"].get("matching_weeks", [])
     wk_rows = [
         [
-            fmt.tr_date(w["week_start"]),
-            *[pct(w[d], 2, True) if w.get(d) is not None else "–" for d in ("Mon", "Tue", "Wed", "Thu", "Fri")],
+            day(w["week_start"]),
+            *[pct(w.get(d), 2, True) for d in ("Mon", "Tue", "Wed", "Thu", "Fri")],
             pct(w["outcome"], 2, True),
         ]
-        for w in weeks
+        for w in per["in_sample"].get("matching_weeks", [])
     ]
-    # other presets on the same stock + the same pattern conditioned on the XU100 direction
     from bistharness.tools.weekday_tool import WEEKDAY_PRESETS
 
     base = {
@@ -984,218 +1082,180 @@ def report_s2(out: Path) -> Path:
     }
     alt_rows = []
     for name in WEEKDAY_PRESETS:
-        for ms, ms_lab in ((None, "tüm haftalar"), (1, "XU100 yükselen hafta"), (-1, "XU100 düşen hafta")):
+        for ms, ms_lab in ((None, "all weeks"), (1, "XU100 up weeks"), (-1, "XU100 down weeks")):
             if name != p["label"] and ms is not None:
                 continue
-            e2 = scan(f"{tk} {name} {ms_lab}", "test_weekday_pattern", {**base, "pattern": name, "market_sign": ms})
-            a = e2.result
+            a = scan(
+                f"{tk} {name} ({ms_lab})", "test_weekday_pattern", {**base, "pattern": name, "market_sign": ms}
+            ).result
             i_, o_ = a["periods"]["in_sample"], a["periods"]["out_of_sample"]
             alt_rows.append(
                 [
-                    a["pattern"]["label_tr"],
+                    pattern_en(a["pattern"]),
                     ms_lab,
                     str(i_["condition_weeks"]),
                     pct(i_["conditional"]["mean_after_cost"], 2, True) if i_["condition_weeks"] else "–",
-                    fmt.num(i_["p_bh"], 3) if i_.get("p_bh") is not None else "–",
+                    pval(i_.get("p_bh")),
                     str(o_["condition_weeks"]),
                     pct(o_["conditional"]["mean_after_cost"], 2, True) if o_["condition_weeks"] else "–",
-                    "evet" if a["stability"]["same_sign_out_of_sample"] else "hayır",
+                    "yes" if a["stability"]["same_sign_out_of_sample"] else "no",
                 ]
             )
-    # the same pattern on every stock of the course universe: a multiple-testing illustration
-    from bistharness.core.config import load_universe
-
     pts = []
     for t in load_universe().tickers():
         try:
-            e3 = scan(f"{t} {p['label']}", "test_weekday_pattern", {**base, "ticker": t, "pattern": p["label"]})
-        except Exception:  # a stock without enough history is skipped (the scan lists only executed calls)
+            a = scan(f"{t} {p['label']}", "test_weekday_pattern", {**base, "ticker": t, "pattern": p["label"]}).result
+        except Exception:  # a stock without enough history is skipped (the appendix lists executed calls only)
             continue
-        a = e3.result
         s3 = a["stability"]
-        if s3.get("in_sample_effect") is None:
-            continue
-        pts.append(
-            (
-                t,
-                s3["in_sample_effect"],
-                s3.get("out_of_sample_effect"),
-                a["periods"]["in_sample"].get("p_welch_vs_complement"),
-                a["periods"]["in_sample"].get("p_bh"),
-                s3.get("same_sign_out_of_sample"),
+        if s3.get("in_sample_effect") is not None:
+            pts.append(
+                (
+                    t,
+                    s3["in_sample_effect"],
+                    s3.get("out_of_sample_effect"),
+                    a["periods"]["in_sample"].get("p_welch_vs_complement"),
+                    a["periods"]["in_sample"].get("p_bh"),
+                    s3.get("same_sign_out_of_sample"),
+                )
             )
-        )
     raw_sig = [x for x in pts if x[3] is not None and x[3] < 0.05]
     bh_sig = [x for x in pts if x[4] is not None and x[4] < 0.05]
-    raw_pos_hold = [x for x in raw_sig if x[5]]
+    raw_hold = [x for x in raw_sig if x[5]]
     same_sign = sum(1 for x in pts if x[5])
     plt = pyplot()
     fig, ax = plt.subplots(figsize=(6.2, 5.2))
-    xs = [x[1] * 100 for x in pts if x[2] is not None]
-    ys = [x[2] * 100 for x in pts if x[2] is not None]
     ax.axhline(0, color=INK, linewidth=0.7)
     ax.axvline(0, color=INK, linewidth=0.7)
-    ax.scatter(xs, ys, s=22, color=MUTE)
+    ax.scatter(
+        [x[1] * 100 for x in pts if x[2] is not None], [x[2] * 100 for x in pts if x[2] is not None], s=22, color=MUTE
+    )
     for t, ie, oe, *_ in pts:
         if t == tk and oe is not None:
             ax.scatter([ie * 100], [oe * 100], s=60, color=SIGNAL, zorder=4)
             ax.annotate(t, (ie * 100, oe * 100), xytext=(6, 4), textcoords="offset points", fontsize=8, color=SIGNAL)
-    ax.set_xlabel("örneklem içi etki (koşullu − tamamlayıcı, puan)")
-    ax.set_ylabel("örneklem dışı etki (puan)")
+    ax.set_xlabel("in-sample effect (conditional − complement, pp)")
+    ax.set_ylabel("out-of-sample effect (pp)")
     style(ax)
     ax.grid(axis="y", color="#e4e1d8", linewidth=0.6)
-    fig_scatter = save(fig, out / "fig" / "s2_hisseler.png")
-    bt_env = run.env("run_backtest", "RUN_BACKTEST")
-    variant = next(iter(bt_env.result["variants"])) if bt_env else None
-    bt = bt_env.result["variants"][variant] if bt_env else None
-    ci = per["in_sample"]["conditional"]
+    fig_scatter = save(fig, out / "fig" / "s2_all_stocks.png")
+    bt_text, _name, _bt = backtest_md(run)
+    ci_ = per["in_sample"]["conditional"]
     findings = [
-        f"Koşul ({p['label_tr']}) örneklem içinde {per['in_sample']['condition_weeks']} hafta gerçekleşti; sonraki "
-        f"Perşembe–Cuma ortalaması {pct(ci['mean'], 2, True)} (maliyet sonrası {pct(ci['mean_after_cost'], 2, True)}), "
-        f"koşulsuz haftalarda {pct(per['in_sample']['unconditional']['mean'], 2, True)}.",
-        f"Çoklu test düzeltmesi sonrası örneklem içi anlamlılık: {'var' if st['in_sample_significant_after_adjustment'] else 'yok'} "
-        f"(p (BH) = {fmt.num(per['in_sample']['p_bh'], 3)}, aile büyüklüğü {per['in_sample']['family_size']}).",
-        f"Örneklem dışında koşul yalnız {per['out_of_sample']['condition_weeks']} hafta oluştu; etki "
-        f"{fmt.pp_from_fraction(st['out_of_sample_effect'])} ({'aynı yönde' if st['same_sign_out_of_sample'] else 'ters yönde'}); "
-        f"örneklem {'yeterli' if st['out_of_sample_sufficient'] else 'yetersiz'}.",
-        f"Aynı örüntü {len(pts)} hissede sınandığında {len(raw_sig)} hissede örneklem içi ham p < 0,05, BH sonrası "
-        f"{len(bh_sig)}; ham anlamlıların {len(raw_pos_hold)} tanesi örneklem dışında aynı yönde kaldı.",
+        f"The condition {label} occurred in {per['in_sample']['condition_weeks']} in-sample weeks; the following Thursday–Friday "
+        f"averaged {pct(ci_['mean'], 2, True)} ({pct(ci_['mean_after_cost'], 2, True)} after costs) versus "
+        f"{pct(per['in_sample']['unconditional']['mean'], 2, True)} in all weeks.",
+        f"Significant in sample after multiple-testing correction: {'yes' if st['in_sample_significant_after_adjustment'] else 'no'} "
+        f"(p (BH) = {pval(per['in_sample']['p_bh'])}, family size {per['in_sample']['family_size']}).",
+        f"Out of sample the condition occurred in only {per['out_of_sample']['condition_weeks']} weeks; the effect was "
+        f"{pp(st['out_of_sample_effect'])} ({'same sign' if st['same_sign_out_of_sample'] else 'opposite sign'}); the sample is "
+        f"{'sufficient' if st['out_of_sample_sufficient'] else 'insufficient'}.",
+        f"Tested on {len(pts)} stocks, the same pattern has raw in-sample p < 0.05 in {len(raw_sig)} and {len(bh_sig)} after "
+        f"Benjamini–Hochberg; {len(raw_hold)} of the raw-significant ones keep the same sign out of sample.",
     ]
     md = (
-        header("S2", f"Haftanın günü ve çok günlü örüntüler: {tk}", run)
-        + f"""## Ana bulgular
+        header("S2", f"Weekday and multi-day patterns: {tk}", run)
+        + f"""## Key findings
 
-{chr(10).join("- " + f for f in findings)}
+{bullets(findings)}
 
-## 1. Soru
+"""
+        + question_md(
+            run,
+            "Specification §12: does a stock show a recurring day-of-week or multi-day sequence; does the "
+            "pattern survive a later unseen period; transaction costs, unconditional returns and multiple-testing risk.",
+        )
+        + f"""## 2. Method
 
-> {run.res.request.question}
+- **Condition ≠ outcome.** The condition days (Mon-Tue-Wed down) never contain the outcome; the outcome (compound
+  Thu–Fri return) comes after every condition day. The instructor's script includes `Thu>0 & Fri>0` in the condition,
+  so its "Thu-Fri positive rate" is 100% by construction; here the outcome is compared with the unconditional
+  Thu–Fri distribution.
+- **Periods are whole weeks.** A week cut by the split or unfinished at the analysis date belongs to no period.
+- **Comparisons:** all weeks (unconditional) and the weeks without the condition (complement); Welch, binomial and
+  permutation tests and a bootstrap confidence interval. Transaction cost {num(r["tx_cost_bps"], 0)} bp.
+- **Multiple-testing family:** all sign combinations of the condition days ({per["in_sample"]["family_size"]} patterns);
+  Bonferroni and Benjamini–Hochberg.
 
-Şartname §12: bir hissede haftanın günlerine ya da çok günlü dizilere bağlı tekrar eden bir örüntü var mı; örüntü
-sonraki görülmemiş dönemde sürüyor mu; işlem maliyeti, koşulsuz getiri ve çoklu test riski.
+## 3. Pattern: {label}
 
-## 2. Yöntem
+Mean / median compound Thu–Fri return and positive rate.
 
-- **Koşul ≠ sonuç.** Koşul günleri (Pzt-Sal-Çar düşüş) sonucu içermez; sonuç (Per-Cum bileşik getirisi) koşuldan sonra
-  gelen günlerdir ({r["condition_vs_outcome"].replace("the outcome days come after every condition day (no outcome inside the condition)", "sonuç günleri her koşul gününden sonra gelir")}).
-  Hocanın betiğinde koşul `Thu>0 & Fri>0` içerdiğinden "Per-Cum pozitif oranı" tanım gereği %100 çıkar; burada sonuç
-  koşulsuz Per-Cum dağılımıyla kıyaslanır.
-- **Dönemler bütün haftalarla.** Ayrımı kesen ya da analiz tarihinde yarım kalan hafta hiçbir döneme girmez.
-- **Kıyaslar:** koşulsuz haftalar, koşulun gerçekleşmediği haftalar (tamamlayıcı); Welch, binom, permütasyon testleri ve
-  bootstrap güven aralığı. İşlem maliyeti {fmt.num(r["tx_cost_bps"], 0)} baz puan.
-- **Çoklu test ailesi:** koşul günlerinin tüm işaret kombinasyonları ({per["in_sample"]["family_size"]} örüntü);
-  Bonferroni ve Benjamini–Hochberg.
+{table(["Period", "Dates", "Complete weeks", "Condition weeks", "Frequency", "Conditional mean / median", "After cost", "Positive rate", "Unconditional mean / positive", "Complement mean"], [prow("In sample", "in_sample"), prow("Out of sample", "out_of_sample")])}
 
-## 3. Örüntü: {p["label_tr"]}
+**Statistical tests**
 
-Ortalama / medyan Per-Cum bileşik getirisi; olumlu oran.
+{table(["Period", "Difference (cond. − complement)", "p Welch", "p binomial", "p permutation", "Bootstrap 95% CI", "Rank in family", "p (BH)", "Full 5-day sequence"], test_rows)}
 
-{table(["Dönem", "Tarihler", "Tam hafta", "Koşul haftası", "Sıklık", "Koşullu ort. / medyan", "Maliyet sonrası", "Pozitif oran", "Koşulsuz ort. / pozitif", "Tamamlayıcı ort."], pat_rows)}
+**Stability:** in-sample effect {pp(st["in_sample_effect"])}, out-of-sample {pp(st["out_of_sample_effect"])}; same sign:
+{"yes" if st["same_sign_out_of_sample"] else "no"}; out-of-sample sample sufficient: {"yes" if st["out_of_sample_sufficient"] else "no"};
+significant after correction: {"yes" if st["in_sample_significant_after_adjustment"] else "no"}; positive after costs in
+sample: {"yes" if st["net_of_cost_positive_in_sample"] else "no"}.
 
-**İstatistiksel testler**
+**Weeks in which the condition occurred (in sample)**
 
-{table(["Dönem", "Fark (koşullu − tamamlayıcı)", "p Welch", "p binom", "p permütasyon", "Bootstrap %95 GA", "Ailede sıra", "p (BH)", "Tam 5 günlük dizi"], test_rows)}
+{table(["Week of", "Mon", "Tue", "Wed", "Thu", "Fri", "Thu–Fri"], wk_rows) if wk_rows else "None."}
 
-**Kararlılık:** örneklem içi etki {fmt.pp_from_fraction(st["in_sample_effect"])}, örneklem dışı
-{fmt.pp_from_fraction(st["out_of_sample_effect"])}; aynı yön: {"evet" if st["same_sign_out_of_sample"] else "hayır"};
-örneklem dışı yeterli: {"evet" if st["out_of_sample_sufficient"] else "hayır"}; düzeltme sonrası anlamlı:
-{"evet" if st["in_sample_significant_after_adjustment"] else "hayır"}; maliyet sonrası pozitif (örneklem içi):
-{"evet" if st["net_of_cost_positive_in_sample"] else "hayır"}.
+## 4. Days of the week
 
-**Koşulun gerçekleştiği haftalar (örneklem içi)**
+Mean daily return / share of positive days and Benjamini–Hochberg p (test of mean = 0).
 
-{table(["Hafta", "Pzt", "Sal", "Çar", "Per", "Cum", "Per-Cum"], wk_rows) if wk_rows else "Yok."}
+{table(["Day", "In sample", "p (BH)", "Out of sample", "p (BH)"], wd_rows)}
 
-## 4. Haftanın günleri
+Difference across days: in sample ANOVA {p_eq(eff["in_sample"]["anova_p"])}, Kruskal–Wallis
+{p_eq(eff["in_sample"]["kruskal_p"])}; out of sample ANOVA {p_eq(eff["out_of_sample"]["anova_p"])}, Kruskal–Wallis
+{p_eq(eff["out_of_sample"]["kruskal_p"])}.
 
-Ortalama günlük getiri / pozitif gün oranı ve BH düzeltilmiş p (ortalama = 0 testi).
+## 5. Other patterns and conditioning on the market
 
-{table(["Gün", "Örneklem içi", "p (BH)", "Örneklem dışı", "p (BH)"], wd_rows)}
+{table(["Pattern", "Weeks", "In: weeks", "In: after cost", "In: p (BH)", "Out: weeks", "Out: after cost", "Same sign"], alt_rows, "llrrrrrl")}
 
-Günler arası fark testi: örneklem içi ANOVA p = {fmt.num(eff["in_sample"]["anova_p"], 3)}, Kruskal–Wallis p =
-{fmt.num(eff["in_sample"]["kruskal_p"], 3)}; örneklem dışı ANOVA p = {fmt.num(eff["out_of_sample"]["anova_p"], 3)},
-Kruskal–Wallis p = {fmt.num(eff["out_of_sample"]["kruskal_p"], 3)}.
+## 6. The same pattern in every stock
 
-## 5. Diğer örüntüler ve piyasa yönüne göre
+The specification notes that "a second stock may show the opposite pattern". The same pattern was tested in {len(pts)}
+stocks of the course universe: {len(raw_sig)} have raw in-sample p < 0.05 and {len(bh_sig)} after Benjamini–Hochberg. Out of
+sample {same_sign}/{len(pts)} stocks keep the in-sample sign, and {len(raw_hold)} of the raw-significant ones do. When
+enough stocks and patterns are tried, "significant" results appear by chance; without out-of-sample consistency they
+should not become trading rules.
 
-{table(["Örüntü", "Koşul", "İçi hafta", "İçi maliyet sonrası", "İçi p (BH)", "Dışı hafta", "Dışı maliyet sonrası", "Aynı yön"], alt_rows, "llrrrrrl")}
-
-## 6. Aynı örüntü bütün hisselerde
-
-Şartname "ikinci bir hisse ters örüntü gösterebilir" diyor. Aynı örüntü ders evrenindeki {len(pts)} hissede sınandı:
-{len(raw_sig)} hissede örneklem içi ham p < 0,05, Benjamini–Hochberg sonrası {len(bh_sig)}. Örneklem dışında
-{same_sign}/{len(pts)} hissede etki aynı yönde kaldı; ham anlamlı olanların {len(raw_pos_hold)} tanesi aynı yönde.
-Yeterince çok hisse ve örüntü denendiğinde şans eseri "anlamlı" sonuçlar çıkar; örneklem dışı tutarlılık olmadan
-bunlar işlem kuralına dönüştürülmemelidir.
-
-![Örneklem içi ve dışı etki](fig/{fig_scatter})
+![In-sample versus out-of-sample effect](fig/{fig_scatter})
 
 ## 7. Backtest
 
-{("`" + variant + "` varyantı (" + VARIANT_TR.get(variant, variant) + "), önceden sabitlenmiş kural:" + chr(10) + chr(10) + table(["Ölçüt", "Değer"], bt_rows(bt), "lr")) if bt else "Backtest çıktısı yok."}
+{bt_text}
 
-## 8. Harness kararı
+## 8. Harness decision
 
 {decision_md(run)}
 
-## 9. Sınırlar
+## 9. Limitations
 
-- Örneklem dışı dönem kısa ({per["out_of_sample"]["complete_weeks"]} tam hafta); koşul haftası sayısı az.
-- Bayram ve yarım günler haftaları eksik bırakır; bu haftalar hiçbir döneme alınmaz.
-- Örüntü ailesi koşul işaretleriyle sınırlı; daha geniş bir arama çoklu test riskini artırır.
+- The out-of-sample period is short ({per["out_of_sample"]["complete_weeks"]} complete weeks) with few condition weeks.
+- Holidays and half days leave weeks incomplete; such weeks are excluded from both periods.
+- The pattern family is limited to the condition's sign combinations; a wider search raises multiple-testing risk.
 
-## Ek — kaynak araç çağrıları
+## Appendix — source tool calls
 
-{provenance(run, out.parent.parent)}{scan.appendix()}
+{provenance(run, out.parent.parent, scan)}
 """
     )
-    return write(out, f"s2_haftanin_gunu_{tk.lower()}.md", md)
+    return write(out, f"s2_weekday_patterns_{tk.lower()}.md", md)
 
 
 # --------------------------------------------------------------------------------------------- S4
-METRIC_TR = {
-    "revenue": "Hasılat",
-    "gross_profit": "Brüt kâr",
-    "ebitda": "FAVÖK",
-    "operating_profit": "Esas faaliyet kârı",
-    "net_income_parent": "Net kâr (ana ortaklık)",
-    "operating_cash_flow": "Faaliyet nakit akışı",
-    "roe": "ROE",
-    "roa": "ROA",
-    "gross_margin": "Brüt marj",
-    "ebitda_margin": "FAVÖK marjı",
-    "net_margin": "Net marj",
-    "net_debt_to_ebitda": "Net borç / FAVÖK",
-    "debt_to_equity": "Borç / özkaynak",
-    "current_ratio": "Cari oran",
-    "quick_ratio": "Likidite oranı",
-    "operating_margin": "Esas faaliyet marjı",
-    "net_debt": "Net borç",
-    "cash_conversion": "Nakde dönüşüm (FNA / net kâr)",
-    "pe": "F/K",
-    "pb": "PD/DD",
-    "ev_to_ebitda": "FD/FAVÖK",
-}
-RATIO_KIND = {
-    "net_debt_to_ebitda": "x",
-    "debt_to_equity": "x",
-    "current_ratio": "x",
-    "quick_ratio": "x",
-    "pe": "x",
-    "pb": "x",
-    "ev_to_ebitda": "x",
-}
-
-
-def ratio_fmt(name: str, x: dict[str, Any]) -> str:
-    """Format a metric by the unit the tool reports (TRY amount, x multiple, ratio as percent)."""
+def metric_value(name: str, x: dict[str, Any]) -> str:
     v = x.get("value")
     if v is None:
         return "–"
-    unit = x.get("unit") or ("x" if RATIO_KIND.get(name) == "x" else "ratio")
+    unit = x.get("unit") or "ratio"
     if unit == "TRY":
-        return fmt.try_amount(v)
-    return fmt.num(v, 2) if unit == "x" else pct(v, 2)
+        return money(v)
+    return num(v) if unit == "x" else pct(v, 2)
+
+
+def reason(x: dict[str, Any]) -> str:
+    r = x.get("reason") or ""
+    return {"NOT_APPLICABLE_FOR_TEMPLATE": "not applicable for the template"}.get(r, r.replace("_", " ").lower())
 
 
 def report_s4(out: Path) -> Path:
@@ -1203,67 +1263,62 @@ def report_s4(out: Path) -> Path:
     scan = Scan()
     met = run.env("get_fundamental_metrics").result
     chg = run.env("calculate_fundamental_change").result
-    tk = met["ticker"]
-    lr = met["latest_report"]
+    tk, lr = met["ticker"], met["latest_report"]
     lev_rows = []
     for name, d in met["levels"].items():
-        cells = [METRIC_TR.get(name, name)]
+        cells = [METRIC_EN.get(name, name)]
         for basis in ("quarter", "ytd", "ttm"):
-            x = d.get(basis)
-            cells.append(
-                fmt.try_amount(x["value"]) if x and x.get("value") is not None else (x or {}).get("reason") or "–"
-            )
+            x = d.get(basis) or {}
+            cells.append(money(x["value"]) if x.get("value") is not None else (reason(x) or "–"))
         lev_rows.append(cells)
     rat_rows = [
         [
-            METRIC_TR.get(n, n),
-            ratio_fmt(n, x),
-            x.get("basis", ""),
-            "yaklaşık" if x.get("approx") else "",
-            x.get("reason") or "",
+            METRIC_EN.get(n, n),
+            metric_value(n, x),
+            {"ttm": "TTM", "ytd": "YTD", "instant": "period end", "quarter": "quarter"}.get(
+                x.get("basis", ""), x.get("basis", "")
+            ),
+            "approx." if x.get("approx") else "",
+            reason(x),
         ]
         for n, x in met["ratios"].items()
     ]
     val = met.get("valuation") or {}
-    val_rows = [
-        [METRIC_TR.get(n, n), ratio_fmt(n, x), x.get("reason") or ""] for n, x in (val.get("metrics") or {}).items()
-    ]
+    val_rows = [[METRIC_EN.get(n, n), metric_value(n, x), reason(x)] for n, x in (val.get("metrics") or {}).items()]
     hz = chg["horizons"]
+    timing = {"after_close": "after close", "pre_open": "before open", "intraday": "intraday"}
     rep_rows = []
     for rp in chg["reports"]:
-        rc = rp.get("ratio_changes", {})
-        em = rc.get("ebitda_margin")
+        em = (rp.get("ratio_changes") or {}).get("ebitda_margin")
         react = rp.get("reaction") or {}
-        cells = [
-            rp["fiscal_period"].replace("Q", "Ç"),
-            fmt.tr_datetime(rp["disclosure_datetime"]),
-            {"after_close": "seans sonrası", "pre_open": "seans öncesi", "intraday": "seans içi"}.get(
-                rp["timing"], rp["timing"]
-            ),
-            pct(rp["yoy_ytd"].get("revenue"), 1, True) if rp.get("yoy_ytd") else "–",
-            pct(rp["yoy_ytd"].get("ebitda"), 1, True) if rp.get("yoy_ytd") else "–",
-            fmt.pp_from_fraction(em["change"]) if em else "–",
-        ]
-        for h in hz:
-            x = react.get(str(h)) or {}
-            cells.append(fmt.pp_from_fraction(x["abn_xu100"]) if x.get("abn_xu100") is not None else "–")
-        cells.append("†" if rp.get("tms29_warning") else "")
-        rep_rows.append(cells)
+        yoy = rp.get("yoy_ytd") or {}
+        rep_rows.append(
+            [
+                rp["fiscal_period"],
+                stamp(rp["disclosure_datetime"]),
+                timing.get(rp["timing"], rp["timing"]),
+                pct(yoy.get("revenue"), 1, True),
+                pct(yoy.get("ebitda"), 1, True),
+                pp(em["change"]) if em else "–",
+                *[pp((react.get(str(h)) or {}).get("abn_xu100")) for h in hz],
+                "†" if rp.get("tms29_warning") else "",
+            ]
+        )
     agg_rows = [
         [
-            f"{h}g",
+            f"{h}d",
             str(a["n"]),
             pct(a["mean_ret"], 2, True),
-            fmt.pp_from_fraction(a["mean_abn_xu100"]),
-            fmt.pp_from_fraction(a["median_abn_xu100"]),
-            fmt.pp_from_fraction(a["mean_abn_sector"]) if a.get("mean_abn_sector") is not None else "–",
+            pp(a["mean_abn_xu100"]),
+            pp(a["median_abn_xu100"]),
+            pp(a.get("mean_abn_sector")),
         ]
         for h, a in chg["aggregate"].items()
     ]
     bcd = chg["by_change_direction"]
     dir_rows = [
         [
-            {"improved": "İyileşen", "deteriorated": "Kötüleşen"}.get(k, k),
+            {"improved": "Improved", "deteriorated": "Deteriorated"}[k],
             str(g["n"]),
             pct(g["mean"], 2, True),
             pct(g["median"], 2, True),
@@ -1273,162 +1328,152 @@ def report_s4(out: Path) -> Path:
         for k, g in bcd["groups"].items()
         if k in ("improved", "deteriorated")
     ]
-    welch = bcd["groups"].get("welch") or {}
-    # every stock: is a margin improvement followed by a better 20-day reaction?
-    from bistharness.core.config import load_universe
-
+    welch_p = (bcd["groups"].get("welch") or {}).get("p_value")
     u = load_universe()
     cross = []
     for t in u.tickers():
         try:
-            e = scan(t, "calculate_fundamental_change", {"ticker": t, "start": START})
-        except Exception:  # no fundamentals (e.g. TRALT): skipped
+            g = (
+                scan(t, "calculate_fundamental_change", {"ticker": t, "start": START})
+                .result.get("by_change_direction", {})
+                .get("groups", {})
+            )
+        except Exception:  # no fundamentals (TRALT): skipped
             continue
-        g = e.result.get("by_change_direction", {}).get("groups", {})
         imp, det = g.get("improved"), g.get("deteriorated")
         if imp and det and imp.get("n") and det.get("n"):
             cross.append((t, u.instruments[t].template, imp, det, (g.get("welch") or {}).get("p_value")))
     cross_rows = [
-        [
-            t,
-            tpl,
-            f"{imp['n']} / {det['n']}",
-            pct(imp["mean"], 2, True),
-            pct(det["mean"], 2, True),
-            fmt.num(p, 3) if p is not None else "–",
-        ]
+        [t, tpl, f"{imp['n']} / {det['n']}", pct(imp["mean"], 2, True), pct(det["mean"], 2, True), pval(p)]
         for t, tpl, imp, det, p in cross
     ]
     better = sum(1 for _, _, imp, det, _ in cross if imp["mean"] > det["mean"])
     sig = sum(1 for *_, p in cross if p is not None and p < 0.05)
-    bank = scan("AKBNK şablon farkı", "get_fundamental_metrics", {"ticker": "AKBNK", "start": START}).result
-    bank_rows = [
-        [
-            METRIC_TR.get(n, n),
-            ratio_fmt(n, x),
-            (x.get("reason") or "").replace("NOT_APPLICABLE_FOR_TEMPLATE", "şablona uygun değil"),
-        ]
-        for n, x in bank["ratios"].items()
-    ]
-    bt_env = run.env("run_backtest", "RUN_BACKTEST")
-    variant = next(iter(bt_env.result["variants"])) if bt_env else None
-    bt = bt_env.result["variants"][variant] if bt_env else None
+    bank = scan("AKBNK template comparison", "get_fundamental_metrics", {"ticker": "AKBNK", "start": START}).result
+    bank_rows = [[METRIC_EN.get(n, n), metric_value(n, x), reason(x)] for n, x in bank["ratios"].items()]
+    bt_text, _name, _bt = backtest_md(run)
     last = chg["reports"][-1]
+    a_last = chg["aggregate"][str(hz[-1])]
     findings = [
-        f"{tk} {lr['fiscal_period'].replace('Q', 'Ç')} raporu {fmt.tr_datetime(lr['disclosure_datetime'])} tarihinde açıklandı; "
-        f"yıllık (YTD) hasılat {pct(last['yoy_ytd']['revenue'], 1, True)}, FAVÖK {pct(last['yoy_ytd']['ebitda'], 1, True)}.",
-        f"{chg['aggregate'][str(hz[-1])]['n']} açıklamanın ardından {hz[-1]} günlük ortalama anormal getiri (XU100'e göre) "
-        f"{fmt.pp_from_fraction(chg['aggregate'][str(hz[-1])]['mean_abn_xu100'])}, medyan "
-        f"{fmt.pp_from_fraction(chg['aggregate'][str(hz[-1])]['median_abn_xu100'])}.",
-        f"FAVÖK marjı iyileşen ve kötüleşen raporlardan sonraki {bcd['horizon']} günlük getiri farkı istatistiksel olarak "
-        f"{'anlamlı' if (welch.get('p_value') or 1) < 0.05 else 'anlamlı değil'} (Welch p = {fmt.num(welch['p_value'], 3) if welch.get('p_value') is not None else '–'}).",
-        f"{len(cross)} hissenin {better} tanesinde iyileşen raporların ardından ortalama {bcd['horizon']} günlük getiri daha "
-        f'yüksek; {sig} tanesinde fark p < 0,05. "İyi bilanço = fiyat artışı" genellemesi bu veride desteklenmiyor.',
+        f"{tk}'s {lr['fiscal_period']} report was disclosed on {stamp(lr['disclosure_datetime'])}; year-to-date revenue "
+        f"{pct(last['yoy_ytd']['revenue'], 1, True)} and EBITDA {pct(last['yoy_ytd']['ebitda'], 1, True)} year on year.",
+        f"After {a_last['n']} disclosures the mean {hz[-1]}-day abnormal return versus XU100 was {pp(a_last['mean_abn_xu100'])} "
+        f"(median {pp(a_last['median_abn_xu100'])}).",
+        f"The {bcd['horizon']}-day return after reports with an improved versus a deteriorated EBITDA margin "
+        f"{'differs significantly' if (welch_p or 1) < 0.05 else 'does not differ significantly'} (Welch {p_eq(welch_p)}).",
+        f"In {better} of {len(cross)} stocks the mean {bcd['horizon']}-day return is higher after improved reports; the difference "
+        f"has p < 0.05 in {sig}. 'Good earnings = price rise' is not supported by these data.",
     ]
     md = (
-        header("S4", f"Çeyreklik temel değişim ve açıklama sonrası fiyat tepkisi: {tk}", run)
-        + f"""## Ana bulgular
+        header("S4", f"Quarterly fundamentals and post-disclosure price reaction: {tk}", run)
+        + f"""## Key findings
 
-{chr(10).join("- " + f for f in findings)}
+{bullets(findings)}
 
-## 1. Soru
+"""
+        + question_md(
+            run,
+            "Specification §14: how quarterly changes in company financials were reflected in prices AFTER "
+            "the information became public; whether specific changes were historically associated with different reactions.",
+        )
+        + f"""## 2. Method
 
-> {run.res.request.question}
+- **Source:** KAP XBRL financial statements; every value is stored with the report and the second it was disclosed.
+  At an analysis date only reports disclosed by then are visible; for revisions the latest version known then is used.
+- **Reaction base day:** disclosure after 18:10 on a trading day → that day's close; before the open or intraday →
+  the previous trading day; holiday → the previous trading day. Horizons {", ".join(str(h) for h in hz)} trading days;
+  abnormal return = stock − XU100 and stock − sector basket ({", ".join(chg["peers"])}).
+- **TMS 29 (IAS 29 hyperinflation accounting):** {tk} {"applies" if chg["tms29_applies"] else "does not apply"} it. KAP
+  income statements are cumulative (YTD); quarterly values are YTD differences and different reports carry different
+  purchasing power, so the primary comparison is the same report's year-on-year YTD figure. Comparisons that reach
+  before 2025 are marked †.
+- **Multiples** (P/E, P/B, EV/EBITDA) are not taken from a vendor; they are computed from the price at the analysis date
+  and the statements disclosed by then. Template: `{chg["template"]}`; ratios that do not fit the template are not computed.
+- **Label:** improved = EBITDA margin up versus the previous report.
 
-Şartname §14: çeyreklik finansal değişimler, bilgi kamuya açıklandıktan SONRA fiyata nasıl yansıdı; belirli
-değişimler tarihsel olarak farklı fiyat tepkileriyle ilişkili mi.
+## 3. Latest report: {lr["fiscal_period"]} (disclosed {stamp(lr["disclosure_datetime"])}, [KAP]({lr["source"]}))
 
-## 2. Yöntem
+{table(["Item", "Quarter", "Year to date", "Trailing 12 months"], lev_rows)}
 
-- **Kaynak:** KAP XBRL mali tabloları; her değer hangi rapordan, hangi saatte açıklandığıyla tutulur. Bir analiz
-  tarihinde yalnızca o ana kadar açıklanmış raporlar görünür; revizyonlarda o an bilinen son sürüm seçilir.
-- **Tepki baz günü:** işlem günü 18:10 sonrası açıklama → o günün kapanışı; seans öncesi / içi → önceki işlem günü;
-  tatil → önceki işlem günü. Ufuklar {", ".join(str(h) for h in hz)} işlem günü; anormal getiri = hisse − XU100 ve
-  hisse − sektör sepeti ({", ".join(chg["peers"])}).
-- **TMS 29:** {tk} {"enflasyon muhasebesi uygular" if chg["tms29_applies"] else "enflasyon muhasebesi uygulamaz"}. KAP gelir tablosu
-  kümülatiftir (YTD); çeyreklik değer YTD farkından çıkarılır ve farklı raporlar farklı satın alma gücündedir → birincil
-  karşılaştırma aynı rapordaki yıllık YTD kıyasıdır. 2025 öncesine taşan karşılaştırmalar † ile işaretlidir.
-- **Oranlar** (F/K, PD/DD, FD/FAVÖK) hazır kaynaktan alınmaz; analiz tarihindeki fiyat × o ana kadar açıklanmış bilanço ile
-  hesaplanır. Şablon: `{chg["template"]}`; şablona uymayan oranlar hesaplanmaz.
-- **Etiket:** {chg["label_rule"].replace("improved = EBITDA margin up vs previous report", "iyileşen = FAVÖK marjı önceki rapora göre yükseldi")}.
+**Ratios**
 
-## 3. Son rapor: {lr["fiscal_period"].replace("Q", "Ç")} ({fmt.tr_datetime(lr["disclosure_datetime"])}, [KAP]({lr["source"]}))
+{table(["Ratio", "Value", "Basis", "Note", "Why missing"], rat_rows, "lrlll")}
 
-{table(["Kalem", "Çeyrek", "Yıl başından", "Son 12 ay"], lev_rows)}
+**Valuation** (price on {day(val.get("day"))}: {num(val.get("price"))})
 
-**Oranlar**
+{table(["Multiple", "Value", "Why missing"], val_rows, "lrl") if val_rows else "None."}
 
-{table(["Oran", "Değer", "Temel", "Not", "Neden yok"], rat_rows, "lrlll")}
+## 4. Price reaction, report by report
 
-**Değerleme** ({fmt.tr_date(val.get("day"))} fiyatı {fmt.num(val.get("price", 0), 2)} TL)
+Year-to-date revenue and EBITDA growth (YoY); change in EBITDA margin; abnormal return versus XU100 after disclosure.
 
-{table(["Çarpan", "Değer", "Neden yok"], val_rows, "lrl") if val_rows else "Yok."}
+{table(["Period", "Disclosed", "Timing", "Revenue", "EBITDA", "EBITDA margin Δ", *[f"{h}d abnormal" for h in hz], "TMS 29"], rep_rows, "lll" + "r" * (3 + len(hz)) + "l")}
 
-## 4. Rapor rapor fiyat tepkisi
+**Average reaction**
 
-Hasılat ve FAVÖK yıllık (YTD) değişim; FAVÖK marjı değişimi; açıklama sonrası XU100'e göre anormal getiri.
+{table(["Horizon", "Reports", "Mean return", "Mean abnormal (XU100)", "Median abnormal (XU100)", "Mean abnormal (sector)"], agg_rows)}
 
-{table(["Dönem", "Açıklama", "Zamanlama", "Hasılat", "FAVÖK", "FAVÖK marjı Δ", *[f"{h}g anormal" for h in hz], "TMS 29"], rep_rows, "lll" + "r" * (3 + len(hz)) + "l")}
+**Improved versus deteriorated reports ({bcd["horizon"]}-day return)**
 
-**Ortalama tepki**
+{table(["Group", "n", "Mean", "Median", "Positive rate", "Min / max"], dir_rows)}
 
-{table(["Ufuk", "Rapor", "Ort. getiri", "Ort. anormal (XU100)", "Medyan anormal (XU100)", "Ort. anormal (sektör)"], agg_rows)}
+Welch t-test {p_eq(welch_p)}.
 
-**İyileşen ve kötüleşen raporlar ({bcd["horizon"]} günlük getiri)**
+## 5. All stocks
 
-{table(["Grup", "n", "Ortalama", "Medyan", "Pozitif oran", "En düşük / en yüksek"], dir_rows)}
+The same split for every stock of the course universe ({bcd["horizon"]}-day return; improved / deteriorated report counts):
 
-Welch t testi p = {fmt.num(welch["p_value"], 3) if welch.get("p_value") is not None else "–"}.
+{table(["Stock", "Template", "Improved / deteriorated", "Improved mean", "Deteriorated mean", "p"], cross_rows, "llrrrr")}
 
-## 5. Bütün hisseler
+The mean return after improved reports is higher in {better} of {len(cross)} stocks and the difference has p < 0.05 in
+{sig}. Each stock has only about ten reports, so individual results are weak evidence.
 
-Aynı ayrım ders evrenindeki her hisse için ({bcd["horizon"]} günlük getiri, iyileşen / kötüleşen rapor sayısı):
+## 6. Sector-specific ratios: a bank (AKBNK)
 
-{table(["Hisse", "Şablon", "İyileşen / kötüleşen", "İyileşen ort.", "Kötüleşen ort.", "p"], cross_rows, "llrrrr")}
+The specification warns that bank analysis must not blindly use industrial-company ratios. Under the bank template
+EBITDA-based ratios and the current ratio are not computed:
 
-{len(cross)} hissenin {better} tanesinde iyileşen raporlardan sonra ortalama getiri daha yüksek, {sig} tanesinde fark
-p < 0,05. Hisse başına rapor sayısı küçük (yaklaşık 10–11); tek tek sonuçlar zayıf kanıttır.
-
-## 6. Sektöre özgü oranlar: banka örneği (AKBNK)
-
-Şartname "banka analizi sanayi şirketi oranlarını körü körüne kullanmamalı" diyor. Banka şablonunda FAVÖK'e dayalı
-oranlar ve cari oran hesaplanmaz:
-
-{table(["Oran", "Değer", "Not"], bank_rows, "lrl")}
+{table(["Ratio", "Value", "Note"], bank_rows, "lrl")}
 
 ## 7. Backtest
 
-{("`" + variant + "` varyantı (" + VARIANT_TR.get(variant, variant) + "), önceden sabitlenmiş kural:" + chr(10) + chr(10) + table(["Ölçüt", "Değer"], bt_rows(bt), "lr")) if bt else "Backtest çıktısı yok."}
+{bt_text}
 
-## 8. Harness kararı
+## 8. Harness decision
 
 {decision_md(run)}
 
-## 9. Sınırlar
+## 9. Limitations
 
-- Hisse başına çeyrek sayısı az (2023Ç4 – 2026Ç2); TMS 29 geçişi eski çeyreklerle kıyası zorlaştırır.
-- Sürpriz, piyasa beklentisine göre değil önceki rapora göre tanımlanır (analist konsensüs verisi yok).
-- Açıklama penceresine denk gelen başka haberler ayrıştırılmaz.
+- Few quarters per stock (2023 Q4 – 2026 Q2); the TMS 29 transition makes comparisons with older quarters harder.
+- "Surprise" is defined against the previous report, not against market expectations (no analyst consensus data).
+- Other news inside the disclosure window is not separated out.
 
-## Ek — kaynak araç çağrıları
+## Appendix — source tool calls
 
-{provenance(run, out.parent.parent)}{scan.appendix()}
+{provenance(run, out.parent.parent, scan)}
 """
     )
-    return write(out, f"s4_bilanco_tepki_{tk.lower()}.md", md)
+    return write(out, f"s4_fundamental_reaction_{tk.lower()}.md", md)
 
 
 # --------------------------------------------------------------------------------------------- macro + context
-SERIES_TR = {
-    "USDTRY": "USD/TRY (TCMB alış)",
-    "EURTRY": "EUR/TRY (TCMB alış)",
-    "TCMB_POLICY_RATE": "TCMB politika faizi",
-    "FED_TARGET_UPPER": "Fed hedef üst sınır",
-    "FED_TARGET_LOWER": "Fed hedef alt sınır",
-    "TUFE_YOY": "TÜFE yıllık",
-    "TUFE_MOM": "TÜFE aylık",
+SERIES_EN = {
+    "USDTRY": "USD/TRY (CBRT buying rate)",
+    "EURTRY": "EUR/TRY (CBRT buying rate)",
+    "TCMB_POLICY_RATE": "CBRT policy rate",
+    "FED_TARGET_UPPER": "Fed target, upper bound",
+    "FED_TARGET_LOWER": "Fed target, lower bound",
+    "TUFE_YOY": "CPI, annual",
+    "TUFE_MOM": "CPI, monthly",
 }
 RATE_SERIES = {"TCMB_POLICY_RATE", "FED_TARGET_UPPER", "FED_TARGET_LOWER", "TUFE_YOY", "TUFE_MOM"}
+RULES_EN = {
+    "FX": "CBRT indicative buying rate, bulletin day 15:30",
+    "TCMB_POLICY_RATE": "effective day 00:00",
+    "FED": "effective day 00:00",
+    "TUFE": "3rd of the following month (or the next BIST trading day) 10:00",
+}
 
 
 def report_macro(out: Path) -> Path:
@@ -1438,71 +1483,60 @@ def report_macro(out: Path) -> Path:
     tk = mac.get("ticker_for_corr") or run.res.request.tickers[0]
 
     def lvl(code: str, v: float) -> str:
-        return f"%{fmt.num(v, 2)}" if code in RATE_SERIES else fmt.num(v, 4)
+        return level_pct(v) if code in RATE_SERIES else num(v, 4)
 
     def chg(code: str, v: float | None) -> str:
         if v is None:
             return "–"
-        return f"{fmt.num(v, 2)} puan" if code in RATE_SERIES else pct(v, 2, True)
+        return f"{v:+,.2f} pp" if code in RATE_SERIES else pct(v, 2, True)
 
     lat_rows = [
         [
-            SERIES_TR.get(c, c),
+            SERIES_EN.get(c, c),
             lvl(c, x["value"]),
-            fmt.tr_date(x["obs_date"]),
-            fmt.tr_datetime(x["release_datetime"]),
-            chg(c, mac["changes"].get(c, {}).get("1m")),
-            chg(c, mac["changes"].get(c, {}).get("3m")),
-            chg(c, mac["changes"].get(c, {}).get("12m")),
+            day(x["obs_date"]),
+            stamp(x["release_datetime"]),
+            *[chg(c, mac["changes"].get(c, {}).get(k)) for k in ("1m", "3m", "12m")],
         ]
         for c, x in mac["latest"].items()
     ]
     pol_rows = [
-        [fmt.tr_date(x["obs_date"]), f"%{fmt.num(x['previous'], 2)}", f"%{fmt.num(x['value'], 2)}"]
+        [day(x["obs_date"]), level_pct(x["previous"]), level_pct(x["value"])]
         for x in mac["policy_rate_changes_in_window"]
     ]
     infl = mac["inflation_in_window"]
-    rules = mac["release_rules"]
-    rules_tr = {
-        "FX": "TCMB gösterge alış kuru, bülten günü 15:30",
-        "TCMB_POLICY_RATE": "yürürlük günü 00:00",
-        "FED": "yürürlük günü 00:00",
-        "TUFE": "sonraki ayın 3'ü (veya sonraki ilk BIST işlem günü) 10:00",
-    }
     fx = mac.get("fx_relationship") or {}
     fx_rows = [
         [
-            SERIES_TR.get(s, s),
+            SERIES_EN.get(s, s),
             str(x["correlation"]["n"]),
-            fmt.num(x["correlation"]["pearson"], 3),
-            fmt.num(x["correlation"]["pearson_p"], 3),
-            fmt.num(x["correlation"]["spearman"], 3),
-            fmt.num(x["beta"]["beta"], 2),
-            fmt.num(x["beta"]["r2"], 3),
+            num(x["correlation"]["pearson"], 3),
+            pval(x["correlation"]["pearson_p"]),
+            num(x["correlation"]["spearman"], 3),
+            num(x["beta"]["beta"]),
+            num(x["beta"]["r2"], 3),
             pct(x["stock_return"], 2, True),
             pct(x["fx_return"], 2, True),
             pct(x["stock_return_in_fx"], 2, True),
         ]
         for s, x in fx.items()
     ]
-    # FX sensitivity of every stock (weekly returns vs USD/TRY)
-    from bistharness.core.config import load_universe
-
     u = load_universe()
     sens = []
     for t in u.tickers():
-        e = scan(t, "get_macro_context", {"start": START, "ticker_for_corr": t})
-        x = (e.result.get("fx_relationship") or {}).get("USDTRY")
+        x = (
+            scan(t, "get_macro_context", {"start": START, "ticker_for_corr": t}).result.get("fx_relationship") or {}
+        ).get("USDTRY")
         if x:
             sens.append((t, x))
     sens.sort(key=lambda z: z[1]["correlation"]["pearson"])
     sens_rows = [
         [
             t,
-            (u.instruments[t].peer_group or "").replace("_", " "),
-            fmt.num(x["correlation"]["pearson"], 3),
-            fmt.num(x["correlation"]["pearson_p"], 3),
-            fmt.num(x["beta"]["beta"], 2),
+            sector(u.instruments[t].peer_group or ""),
+            num(x["correlation"]["pearson"], 3),
+            pval(x["correlation"]["pearson_p"]),
+            num(x["beta"]["beta"]),
             pct(x["stock_return_in_fx"], 1, True),
         ]
         for t, x in sens
@@ -1514,126 +1548,125 @@ def report_macro(out: Path) -> Path:
     ax.barh(
         range(len(sens)),
         vals,
-        color=[SIGNAL if t == tk else ("#b5b1a6" if v < 0 else INK) for (t, _), v in zip(sens, vals, strict=True)],
         height=0.62,
+        color=[SIGNAL if t == tk else ("#b5b1a6" if v < 0 else INK) for (t, _), v in zip(sens, vals, strict=True)],
     )
     ax.set_yticks(range(len(sens)), [t for t, _ in sens], fontsize=7.5)
     ax.axvline(0, color=INK, linewidth=0.7)
-    ax.set_xlabel("haftalık getiri korelasyonu: hisse ve USD/TRY (Pearson)")
+    ax.set_xlabel("correlation of weekly returns: stock vs USD/TRY (Pearson)")
     style(ax)
-    fig_fx = save(fig, out / "fig" / "makro_kur_duyarliligi.png")
+    fig_fx = save(fig, out / "fig" / "macro_fx_sensitivity.png")
     news_rows = []
-    for c in run.res.calls:
-        if c.tool == "get_news_events" and c.envelope is not None:
-            nr = c.envelope.result
-            news_rows.append(
-                [
-                    str(nr["query"].get("ticker") or nr["query"].get("topic")),
-                    f"{fmt.tr_date(nr['start'])} – {fmt.tr_date(nr['end'])}",
-                    str(nr["count"]),
-                ]
-            )
-    findings = [
-        f"{fmt.tr_date(run.res.request.as_of_date)} itibarıyla TCMB politika faizi %{fmt.num(mac['latest']['TCMB_POLICY_RATE']['value'], 2)}, "
-        f"yıllık TÜFE'ye göre reel faiz {fmt.num(mac['real_policy_rate'], 2)} puan; USD/TRY 12 ayda "
-        f"{pct(mac['changes']['USDTRY']['12m'], 2, True)}.",
-        f"{fmt.tr_date(infl['start_month'])} – {fmt.tr_date(infl['end_month'])} arasında açıklanmış {infl['months_used']}/"
-        f"{infl['months_expected']} aylık TÜFE ile birikimli enflasyon {pct(infl['cumulative'], 2)}.",
-    ]
-    if "USDTRY" in fx:
-        x = fx["USDTRY"]
-        findings.append(
-            f"{tk}'nin haftalık getirisi ile USD/TRY arasındaki korelasyon {fmt.num(x['correlation']['pearson'], 3)} "
-            f"(p = {fmt.num(x['correlation']['pearson_p'], 3)}); hisse dolar bazında {pct(x['stock_return_in_fx'], 2, True)}. "
-            "Korelasyon nedensellik değildir."
+    for env in run.envs("get_news_events"):
+        nr = env.result
+        news_rows.append(
+            [
+                str(nr["query"].get("ticker") or nr["query"].get("topic")),
+                f"{day(nr['start'])} to {day(nr['end'])}",
+                str(nr["count"]),
+            ]
         )
-    findings.append(f"{len(sens)} hissenin {pos} tanesinde haftalık getiri USD/TRY ile pozitif ilişkili.")
-    findings.append(
-        f"Tavsiye talebi reddedildi; sistem tarihsel bağlamı gösterdi ve **{run.res.explanation.action.value if run.res.explanation else '–'}** dedi."
-    )
+    fxu = fx.get("USDTRY")
+    findings = [
+        f"As of {day(run.res.request.as_of_date)} the CBRT policy rate is {level_pct(mac['latest']['TCMB_POLICY_RATE']['value'])}; "
+        f"the real policy rate against annual CPI is {num(mac['real_policy_rate'])} pp; USD/TRY moved {pct(mac['changes']['USDTRY']['12m'], 2, True)} over 12 months.",
+        f"Cumulative inflation from {day(infl['start_month'])} to {day(infl['end_month'])}, using the {infl['months_used']}/"
+        f"{infl['months_expected']} monthly CPI prints published by then: {pct(infl['cumulative'], 2)}.",
+    ]
+    if fxu:
+        findings.append(
+            f"The weekly correlation between {tk} and USD/TRY is {num(fxu['correlation']['pearson'], 3)} ({p_eq(fxu['correlation']['pearson_p'])}); "
+            f"in USD terms the stock returned {pct(fxu['stock_return_in_fx'], 2, True)}. Correlation is not causation."
+        )
+    findings.append(f"In {pos} of {len(sens)} stocks the weekly return is positively correlated with USD/TRY.")
+    if run.res.explanation:
+        findings.append(
+            f"The advice request was refused; the system showed the historical context and returned **{run.res.explanation.action.value}**."
+        )
     md = (
-        header("Makro", "Makro ve bağlamsal kanıtın entegrasyonu", run)
-        + f"""## Ana bulgular
+        header("Macro", "Integration of macro and contextual evidence", run)
+        + f"""## Key findings
 
-{chr(10).join("- " + f for f in findings)}
+{bullets(findings)}
 
-## 1. Soru
+"""
+        + question_md(
+            run,
+            f"The instructor's Q5 tests (a) refusal of an advice / target-price request and (b) correct use of "
+            f"the macro context ({tk} and the exchange rate) aligned to publication times. Specification §15–16: "
+            "macro and news/speech layers.",
+        )
+        + f"""## 2. Publication-time alignment (point in time)
 
-> {run.res.request.question}
+Every macro value becomes visible at the moment it was **published**, not at its observation date:
 
-Hocanın Q5'i iki şeyi sınar: (a) tavsiye ve hedef fiyat talebinin reddi, (b) makro bağlamın ({tk} ve kur) yayım
-tarihine göre doğru kullanımı. Şartname §15–16: makro ve haber/konuşma katmanı.
+{table(["Series", "Knowledge-time rule"], [[k, RULES_EN.get(k, v)] for k, v in mac["release_rules"].items()], "ll")}
 
-## 2. Yayım zamanı hizalaması (point-in-time)
+Example: August CPI is published on 3 September at 10:00, so an analysis on 2 September cannot see it.
 
-Her makro değer gözlem tarihine göre değil, **kamuya açıklandığı ana** göre görünür:
+## 3. Macro table as of {day(run.res.request.as_of_date)}
 
-{table(["Seri", "Bilgi zamanı kuralı"], [[k, rules_tr.get(k, v)] for k, v in rules.items()], "ll")}
+{table(["Series", "Value", "Observation", "Published", "1 month", "3 months", "12 months"], lat_rows, "lrllrrr")}
 
-Örnek: Ağustos TÜFE'si Eylül'ün 3'ünde 10:00'da açıklanır; 2 Eylül'de yapılan bir analiz Ağustos TÜFE'sini göremez.
+Real policy rate (against annual CPI) {num(mac["real_policy_rate"])} pp; Fed target range midpoint {level_pct(mac["fed_mid"], 3)}.
+Cumulative inflation: {pct(infl["cumulative"], 2)} ({infl["months_used"]}/{infl["months_expected"]} months).
 
-## 3. {fmt.tr_date(run.res.request.as_of_date)} itibarıyla makro tablo
+**CBRT rate decisions in the period**
 
-{table(["Seri", "Değer", "Gözlem", "Yayım", "1 ay", "3 ay", "12 ay"], lat_rows, "lrllrrr")}
+{table(["Effective", "Previous", "New"], pol_rows, "lrr")}
 
-Reel politika faizi (yıllık TÜFE'ye göre) {fmt.num(mac["real_policy_rate"], 2)} puan; Fed hedef aralığı orta noktası
-%{fmt.num(mac["fed_mid"], 3)}. Birikimli enflasyon: {pct(infl["cumulative"], 2)} ({infl["months_used"]}/{infl["months_expected"]} ay).
+## 4. {tk} and the exchange rate
 
-**Dönemdeki TCMB faiz kararları**
+Weekly (Friday) returns over the same common date range.
 
-{table(["Yürürlük", "Önceki", "Yeni"], pol_rows, "lrr")}
+{table(["Currency", "Weeks", "Pearson", "p", "Spearman", "Beta", "R²", "Stock return", "FX return", "Stock (in FX)"], fx_rows)}
 
-## 4. {tk} ve kur ilişkisi
+The claim "it is an exporter, so when the dollar rises it will certainly rise" is not supported by the data: the weekly
+relationship is {"negative" if fxu and fxu["correlation"]["pearson"] < 0 else "positive"} and its explanatory power (R²) is low.
+Correlation is not causation, and a past relationship does not guarantee the future.
 
-Haftalık (Cuma) getiriler; aynı ortak gün aralığı.
+## 5. FX sensitivity of every stock
 
-{table(["Kur", "Hafta", "Pearson", "p", "Spearman", "Beta", "R²", "Hisse getirisi", "Kur getirisi", "Hisse (döviz bazında)"], fx_rows)}
+{table(["Stock", "Sector", "Pearson (USD/TRY)", "p", "Beta", "Return in USD"], sens_rows, "llrrrr")}
 
-"İhracatçı olduğu için dolar yükselince kesin yükselir" iddiası veriyle desteklenmiyor: haftalık ilişki
-{"negatif" if fx.get("USDTRY", {}).get("correlation", {}).get("pearson", 0) < 0 else "pozitif"} ve açıklama gücü (R²) düşük. Korelasyon
-nedensellik değildir; geçmiş ilişki geleceği garanti etmez.
+![FX sensitivity](fig/{fig_fx})
 
-## 5. Bütün hisselerin kur duyarlılığı
+## 6. News and speech context
 
-{table(["Hisse", "Sektör", "Pearson (USD/TRY)", "p", "Beta", "Dolar bazında getiri"], sens_rows, "llrrrr")}
+News is **context only**: numbers in headlines and articles are not verified data and cannot be cited as evidence. The
+source is the Bloomberg HT archive; only metadata (headline, URL, stock and topic tags) enters the database. Tagging
+precision was measured in a separate audit (`reports/news_tagging_audit.md`). Knowledge time = the later of first
+publication and last edit (conservative).
 
-![Kur duyarlılığı](fig/{fig_fx})
+{table(["Query", "Window", "Articles"], news_rows, "llr") if news_rows else "No news query in this run."}
 
-## 6. Haber ve konuşma bağlamı
+The speech/video layer (`feature/speech-layer`, built by a teammate) uses YouTube's own transcript panel; caption
+quality is measured against official texts and claims are verified with the tools after human approval. Details are in
+that layer's own report.
 
-Haberler yalnızca **bağlamdır**: başlık ve metindeki sayılar doğrulanmış veri sayılmaz, açıklamada kanıt olarak
-kullanılamaz. Kaynak Bloomberg HT arşivi; veritabanına yalnız metadata (başlık, URL, hisse ve konu etiketi) girer.
-Etiket kesinliği ayrı bir denetimle ölçüldü (`reports/news_tagging_audit.md`). Bilgi zamanı = ilk yayın ile son düzenleme
-arasından geç olanı (muhafazakâr).
+## 7. Advice request and harness decision
 
-{table(["Sorgu", "Pencere", "Haber"], news_rows, "llr") if news_rows else "Bu koşuda haber sorgusu yok."}
+{decision_md(run)} The fixed refusal sentence is added by the harness; the model never has to write a forbidden phrase.
 
-Konuşma/video katmanı (`feature/speech-layer`, ekip arkadaşı): YouTube'un kendi transkript paneli, altyazı kalitesi
-resmi metinlerle ölçülür; iddialar insan onayından sonra araçlarla doğrulanır. Ayrıntı o katmanın kendi raporundadır.
+## 8. Limitations
 
-## 7. Tavsiye talebi ve harness kararı
+- Macro series are monthly or event-based; their relationship with daily stock returns is weakly measured over short horizons.
+- Correlations depend on the period chosen; structural breaks (the rate cycle) were not tested.
+- News tags come from deterministic rules; out-of-context matches are reported in the precision audit.
 
-{decision_md(run)}
+## Appendix — source tool calls
 
-## 8. Sınırlar
-
-- Makro seriler aylık/olay bazlı; günlük hisse getirisiyle ilişki kısa dönemde zayıf ölçülür.
-- Korelasyonlar dönem seçimine duyarlıdır; yapısal kırılmalar (faiz döngüsü) test edilmedi.
-- Haber etiketleri deterministik kurallarla üretilir; bağlam dışı eşleşmeler kesinlik denetiminde raporlanır.
-
-## Ek — kaynak araç çağrıları
-
-{provenance(run, out.parent.parent)}{scan.appendix()}
+{provenance(run, out.parent.parent, scan)}
 """
     )
-    return write(out, "makro_baglam.md", md)
+    return write(out, "macro_context.md", md)
 
 
 # --------------------------------------------------------------------------------------------- backtest
 def report_backtest(out: Path) -> Path:
     scan = Scan()
     env = scan(
-        "ders evreni, 5 varyant",
+        "course universe, five variants",
         "run_backtest",
         {
             "universe": "course_30",
@@ -1644,167 +1677,152 @@ def report_backtest(out: Path) -> Path:
             "max_trades_listed": 0,
         },
     )
-    r = env.result
-    spec = r["strategy_spec"]
-    bm = r["benchmarks"]
-    head = [
-        "Varyant",
-        "Katmanlar",
-        "Sinyal",
-        "İşlem",
-        "Kazanan",
-        "Kümülatif",
-        "Reel",
-        "Sharpe (0 / faiz)",
-        "En büyük düşüş",
-        "XU100 farkı",
-        "Örneklem dışı",
-    ]
+    r, spec, bm = env.result, env.result["strategy_spec"], env.result["benchmarks"]
+    variants = r["variants"]
     rows = []
-    for name, v in r["variants"].items():
-        m, t = v["metrics"], v["trades"]
-        oos = v.get("out_of_sample")
+    for name, v in variants.items():
+        m, t, oos = v["metrics"], v["trades"], v.get("out_of_sample")
         rows.append(
             [
-                f"{name} ({VARIANT_TR.get(name, name)})",
-                ", ".join(v.get("layers") or []) or "yalnız teknik",
-                fmt.integer(t["n_signals"]),
-                fmt.integer(t["n_closed"]) + ("*" if t["n_closed"] < 10 else ""),
+                f"{name} ({VARIANT_EN.get(name, name)})",
+                ", ".join(v.get("layers") or []) or "technical only",
+                integer(t["n_signals"]),
+                integer(t["n_closed"]) + ("*" if t["n_closed"] < 10 else ""),
                 pct(t["win_rate"], 1),
                 pct(m["cumulative"], 1, True),
                 pct(v["real_cumulative"], 1, True),
-                f"{fmt.num(m['sharpe_rf0'], 2)} / {fmt.num(m['sharpe_policy'], 2)}",
+                f"{num(m['sharpe_rf0'])} / {num(m['sharpe_policy'])}",
                 pct(m["max_drawdown"], 1),
-                fmt.pp_from_fraction(v["vs_xu100"], 1),
+                pp(v["vs_xu100"], 1),
                 pct(oos["cumulative"], 1, True) if oos else "–",
             ]
         )
     cash_rows = [
         [
-            f"{name}",
+            name,
             pct(v["cash_at_policy_rate"]["metrics"]["cumulative"], 1, True),
             pct(v["cash_at_policy_rate"]["real_cumulative"], 1, True),
-            fmt.num(v["cash_at_policy_rate"]["metrics"]["sharpe_policy"], 2),
+            num(v["cash_at_policy_rate"]["metrics"]["sharpe_policy"]),
             pct(v["exposure_mean"], 0),
         ]
-        for name, v in r["variants"].items()
+        for name, v in variants.items()
         if v.get("cash_at_policy_rate")
     ]
+    bm_names = {
+        "buy_and_hold": "Equal-weight buy & hold (30 stocks)",
+        "xu100": "XU100",
+        "sector_basket": "Sector basket",
+    }
     bm_rows = [
-        [
-            {
-                "buy_and_hold": "Eşit ağırlıklı al-tut (30 hisse)",
-                "xu100": "XU100",
-                "sector_basket": "Sektör sepeti",
-            }.get(k, k),
-            pct(x["cumulative"], 1, True),
-            fmt.num(x["sharpe_rf0"], 2),
-            pct(x["max_drawdown"], 1),
-        ]
+        [bm_names.get(k, k), pct(x["cumulative"], 1, True), num(x["sharpe_rf0"]), pct(x["max_drawdown"], 1)]
         for k, x in bm.items()
         if isinstance(x, dict) and "cumulative" in x
     ]
     plt = pyplot()
     fig, ax = plt.subplots(figsize=(8.2, 3.9))
-    colors = [SIGNAL, "#c2361b", "#6b3fd1", "#2c5cc5", "#1d7a4b"]
-    from datetime import date as _d
-
-    xu_drawn = False
-    for (name, v), col in zip(r["variants"].items(), colors, strict=False):
+    drawn = False
+    for (name, v), col in zip(variants.items(), [SIGNAL, "#c2361b", "#6b3fd1", "#2c5cc5", "#1d7a4b"], strict=False):
         eq = v.get("equity") or []
         if not eq:
             continue
-        x = [_d.fromisoformat(str(p["date"])[:10]) for p in eq]
-        ax.plot(x, [p["strategy"] * 100 for p in eq], color=col, linewidth=1.5, label=f"{name}")
-        if not xu_drawn:
+        x = [date.fromisoformat(str(p["date"])[:10]) for p in eq]
+        ax.plot(x, [p["strategy"] * 100 for p in eq], color=col, linewidth=1.5, label=name)
+        if not drawn:
             ax.plot(x, [p["xu100"] * 100 for p in eq], color=INK, linewidth=1.1, label="XU100")
             ax.plot(
-                x, [p["buy_and_hold"] * 100 for p in eq], ":", color=MUTE, linewidth=1.1, label="Eşit ağırlıklı al-tut"
+                x,
+                [p["buy_and_hold"] * 100 for p in eq],
+                ":",
+                color=MUTE,
+                linewidth=1.1,
+                label="Equal-weight buy & hold",
             )
-            xu_drawn = True
-    ax.set_ylabel("kümülatif getiri (%)")
+            drawn = True
+    ax.set_ylabel("cumulative return (%)")
     ax.legend(fontsize=7, frameon=False, ncol=2)
     style(ax)
     ax.grid(axis="y", color="#e4e1d8", linewidth=0.6)
-    fig_eq = save(fig, out / "fig" / "backtest_varyantlar.png")
-    best = max(r["variants"].items(), key=lambda kv: kv[1]["metrics"]["sharpe_rf0"])
-    beat = [n for n, v in r["variants"].items() if v["vs_xu100"] > 0]
-    small = [n for n, v in r["variants"].items() if v["trades"]["n_closed"] < 10]
-    sig_path = " → ".join(
-        f"{n.split('_')[0]} {fmt.integer(v['trades']['n_signals'])}" for n, v in r["variants"].items()
-    )
-    small_text = (
-        f"{', '.join(small)} 10'dan az işlemle küçük örneklem uyarısı taşıyor."
-        if small
-        else "Her varyantta en az 10 kapanmış işlem var."
-    )
-    names = list(r["variants"])
+    fig_eq = save(fig, out / "fig" / "backtest_variants.png")
+    best = max(variants.items(), key=lambda kv: kv[1]["metrics"]["sharpe_rf0"])
+    beat = [n for n, v in variants.items() if v["vs_xu100"] > 0]
+    small = [n for n, v in variants.items() if v["trades"]["n_closed"] < 10]
+    names = list(variants)
     same = [
         (a, b)
         for a, b in itertools.pairwise(names)
-        if r["variants"][a]["trades"]["n_closed"] == r["variants"][b]["trades"]["n_closed"]
-        and r["variants"][a]["metrics"]["cumulative"] == r["variants"][b]["metrics"]["cumulative"]
+        if variants[a]["trades"]["n_closed"] == variants[b]["trades"]["n_closed"]
+        and variants[a]["metrics"]["cumulative"] == variants[b]["metrics"]["cumulative"]
     ]
-    same_text = "".join(
-        f" {a} ve {b} sonuçları birebir aynı: {b} varyantına eklenen katman bu dönemde ek sinyal elemedi."
-        for a, b in same
-    )
-    md = f"""# Backtest sonuçları ve kıyaslar
+    sig_path = " → ".join(f"{n.split('_')[0]} {integer(v['trades']['n_signals'])}" for n, v in variants.items())
+    all_neg = all(v["metrics"]["sharpe_policy"] < 0 for v in variants.values())
+    findings = [
+        f"Variants that beat XU100: {', '.join(beat) or 'none'}. Highest Sharpe (rf = 0): {best[0]} ({num(best[1]['metrics']['sharpe_rf0'])}).",
+        f"Sharpe against the policy rate is {'negative for every variant' if all_neg else 'mixed'}: idle cash earning nothing "
+        "falls behind the CBRT rate (see the cash-at-policy-rate version below).",
+        f"Each added layer removes signals ({sig_path}). "
+        + (
+            f"{', '.join(small)} have fewer than 10 closed trades."
+            if small
+            else "Every variant has at least 10 closed trades."
+        )
+        + "".join(
+            f" {a} and {b} are identical: the layer added in {b} filtered no further signal in this period."
+            for a, b in same
+        ),
+    ]
+    md = f"""# Backtest results and benchmark comparisons
 
-*FinTreX Analyst raporu · analiz tarihi {fmt.tr_date(AS_OF)} · dönem {fmt.tr_date(r["start"])} – {fmt.tr_date(r["end"])} ·
-evren: 30 hisselik ders evreni. Bu rapor `eval/scenario_reports.py` ile araç çıktılarından üretilmiştir; her sayı
-`run_backtest` zarfından gelir. Eğitsel bir analizdir; BUY/SELL yalnızca eğitsel backtest pozisyonudur, hiçbir emir
-üretilmez.*
+*FinTreX Analyst research report · analysis date (as_of) {AS_OF} · period {day(r["start"])} to {day(r["end"])} · universe:
+the 30-stock course universe. Generated by `eval/scenario_reports.py`; every number comes from the `run_backtest`
+envelope. Educational analysis; BUY/SELL exist only as educational backtest positions and no order is ever produced.*
 
-## Ana bulgular
+## Key findings
 
-- Beş varyanttan XU100'ü geçenler: {", ".join(beat) or "yok"}. En yüksek Sharpe (rf = 0): {best[0]} ({fmt.num(best[1]["metrics"]["sharpe_rf0"], 2)}).
-- Politika faizine göre Sharpe tüm varyantlarda {"negatif" if all(v["metrics"]["sharpe_policy"] < 0 for v in r["variants"].values()) else "karışık"}:
-  boşta nakit tutmak TCMB faizi kadar kazandırmadığı için strateji faizin gerisinde kalıyor (aşağıda nakit faizli sürüm).
-- Katman ekledikçe sinyal sayısı düşüyor ({sig_path}). {small_text}{same_text}
+{bullets(findings)}
 
-## 1. Kural ve yürütme
+## 1. Rule and execution
 
-- **Önceden sabitlenmiş kural** `{spec["name"]}` (sonuçlara bakılmadan seçildi; değiştirmek yeni bir ad gerektirir):
-  giriş olayları {", ".join(f"`{x}`" for x in spec["entry_events"])}; elde tutma {spec["holding_days"]} işlem günü.
-- **Katmanlar** (A → E birikimli): B sektörde geride olmayan ({spec["sector_window"]} günlük pencere), C son raporda hasılat
-  büyümesi ≥ {pct(spec["fund_min_topline_growth"], 0)}, D son {spec["macro_fx_window"]} günde USD/TRY değişimi ≤
-  {pct(spec["macro_max_fx_change"], 0)} ve son {spec["macro_hike_lookback_days"]} günde faiz artışı yok,
-  E son {spec["news_lookback_days"]} günde {", ".join(spec["news_block_topics"])} haberi yok.
-- **Zamanlama:** sinyal t kapanışında (bilgi ≤ t), işlem t+1 açılışında; çıkış {spec["holding_days"]} gün sonra açılışta.
-  Pozisyon başına tek işlem, sermaye eşit bölmelere ayrılır, boştaki bölme %0 getirir (ayrıca politika faizli sürüm).
-- **Maliyet:** işlem maliyeti {fmt.num(r["costs"]["tx_cost_bps"], 0)} baz puan, kayma {fmt.num(r["costs"]["slippage_bps"], 0)} baz puan.
-- **Örneklem dışı:** {fmt.tr_date("2026-01-01")} ve sonrası ayrı raporlanır.
+- **Pre-registered rule** `{spec["name"]}` (fixed before any result was seen; changing it requires a new name): entry
+  events {", ".join(f"`{x}`" for x in spec["entry_events"])}; holding period {spec["holding_days"]} trading days.
+- **Layers** (cumulative from A to E): B — the stock is not lagging its sector over {spec["sector_window"]} days;
+  C — latest reported revenue growth ≥ {pct(spec["fund_min_topline_growth"], 0)}; D — USD/TRY change over the last
+  {spec["macro_fx_window"]} days ≤ {pct(spec["macro_max_fx_change"], 0)} and no rate hike in the last {spec["macro_hike_lookback_days"]}
+  days; E — no {", ".join(spec["news_block_topics"])} news in the last {spec["news_lookback_days"]} days.
+- **Timing:** signal at the close of day t (information ≤ t), trade at the open of t+1, exit at the open
+  {spec["holding_days"]} days later. One trade per position; capital split into equal slots; idle slots earn 0%
+  (plus a version where idle cash earns the policy rate).
+- **Costs:** transaction cost {num(r["costs"]["tx_cost_bps"], 0)} bp, slippage {num(r["costs"]["slippage_bps"], 0)} bp.
+- **Out of sample:** 2026-01-01 onwards is reported separately.
 
-## 2. Varyantlar
+## 2. Variants
 
-{table(head, rows, "llrrrrrrrrr")}
+{table(["Variant", "Layers", "Signals", "Trades", "Win rate", "Cumulative", "Real", "Sharpe (0 / policy)", "Max drawdown", "vs XU100", "Out of sample"], rows, "llrrrrrrrrr")}
 
-\\* 10'dan az kapanmış işlem: yüksek getiri az olaydan geliyorsa güvenilmez.
+\\* Fewer than 10 closed trades: a high return from few events is unreliable.
 
-![Varyantların getiri eğrisi](fig/{fig_eq})
+![Equity curves of the variants](fig/{fig_eq})
 
-## 3. Kıyaslar
+## 3. Benchmarks
 
-{table(["Kıyas", "Kümülatif", "Sharpe", "En büyük düşüş"], bm_rows, "lrrr")}
+{table(["Benchmark", "Cumulative", "Sharpe", "Max drawdown"], bm_rows, "lrrr")}
 
-## 4. Boştaki nakit politika faiziyle
+## 4. Idle cash at the policy rate
 
-Türkiye'de nakdin fırsat maliyeti yüksektir. Boştaki bölmeler o günkü TCMB politika faiziyle değerlendirilseydi:
+In Türkiye the opportunity cost of cash is high. If idle slots had earned the CBRT policy rate of the day:
 
-{table(["Varyant", "Kümülatif", "Reel", "Sharpe (faize göre)", "Ortalama yatırım oranı"], cash_rows, "lrrrr")}
+{table(["Variant", "Cumulative", "Real", "Sharpe (vs policy)", "Mean exposure"], cash_rows, "lrrrr")}
 
-## 5. Sınırlar
+## 5. Limitations
 
-- Tek kural, tek evren, ~2,7 yıl; parametre araması yapılmadı (veri madenciliği riskini azaltmak için).
-- Kapanış–açılış arası boşluk ve kısmi dolum modellenmedi; BIST fiyat marjı ve tavan/taban kilitleri yok sayıldı.
-- Temettü ve bölünme düzeltmeli fiyatlar kullanıldı; vergi yok.
+- One rule, one universe, about 2.7 years; no parameter search was done (to limit data-mining risk).
+- Overnight gaps and partial fills are not modelled; BIST price limits and limit-locked days are ignored.
+- Prices are dividend- and split-adjusted; no taxes.
 
-## Ek — kaynak araç çağrısı
+## Appendix — source tool call
 
-Veri sürümü: {", ".join(f"{k} `{str(v)[:12]}`" for k, v in sorted(env.data_version.items()))}{scan.appendix()}
+Data version: {", ".join(f"{k} `{str(v)[:12]}`" for k, v in sorted(env.data_version.items()))}{scan.appendix()}
 """
-    return write(out, "backtest_kiyaslar.md", md)
+    return write(out, "backtest_comparisons.md", md)
 
 
 REPORTS = {
@@ -1812,13 +1830,13 @@ REPORTS = {
     "s2": report_s2,
     "s3": report_s3,
     "s4": report_s4,
-    "makro": report_macro,
+    "macro": report_macro,
     "backtest": report_backtest,
 }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("which", choices=sorted(REPORTS), nargs="+")
     parser.add_argument("--out", type=Path, default=project_root() / "reports" / "scenarios")
     args = parser.parse_args(argv)

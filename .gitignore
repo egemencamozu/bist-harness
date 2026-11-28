@@ -48,3 +48,6 @@ data/manual/claims/
 # Downloaded release assets (setup/get_assets.ps1)
 .assets/
 /.CHECKPOINT.*.tmp
+
+# report build (npm)
+reports/final/build/node_modules/

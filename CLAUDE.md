@@ -557,7 +557,17 @@ Verilen kararlar (2026-11-20):
   geçirip `reports/scenarios/` altına S1, S2, S3, S4, makro ve backtest raporlarını + `fig/` grafiklerini üretir; her sayı
   araç zarfından, ekte call_id ve veri sürümü, koşular `episodic_q*.sqlite` (replay). Kıyas için tüm 30 hisse/sektör
   taraması aynı snapshot'tan. matplotlib `report` ekstrası. Komut: `uv run --extra report python -m eval.scenario_reports
-  s1 s2 s3 s4 makro backtest`. Getiri FARKLARI "puan" ile yazılır (%. değil).
+  s1 s2 s3 s4 macro backtest`. Getiri FARKLARI "pp" (yüzde puan) ile yazılır.
+- **Rapor dili (2026-11-28, kullanıcı kararı):** TÜM raporlar ve teslimler İNGİLİZCE (senaryo raporları, veri sözlüğü,
+  haber denetimi, final teknik rapor, sunum). Sayı biçimi İngilizce (12.35%, 1,234.5, ISO tarih). Ürünün kendisi
+  (arayüz, model açıklamaları) Türkçe kalır; raporlar sistemin Türkçe metnini alıntılamaz, kararı İngilizce özetler.
+  Haber denetimindeki başlıklar kaynak gösterimi olduğu için orijinal Türkçe kalır.
+
+- **Final teknik rapor (2026-11-28):** `reports/final/FinTreX_Analyst_Technical_Report.docx` + `.pdf` (İngilizce, 32 sayfa).
+  Üretim: `uv run --extra report python reports/final/build/make_figures.py` (şekiller + `data.json`, sayılar
+  `reports/` dosyalarından) → `node reports/final/build/build_report.js` (docx-js; `npm install` aynı klasörde) →
+  `powershell -File reportsinaluild	o_pdf.ps1` (Word: içindekiler güncellenir, PDF dışa aktarılır).
+  Bulgular senaryo raporlarının "Key findings"inden kopyalanır. Yazarlar: Egemen Çamözü (20220808076), Batuhan Erdem (20230808611).
 
 Açık:
 1. (kapandı) Makro anahtarsız çözüldü — §11.
