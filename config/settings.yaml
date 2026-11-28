@@ -2,6 +2,7 @@
 paths:
   db: data/db/bist.sqlite
   raw: data/raw
+  manual: data/manual            # hand-curated, publication-dated inputs (videos.csv + pasted transcripts)
   external:
     price_scraper_output: ../FinTreX/price-scraper/output
     price_scraper_batches: [bist_1, bist_2, bist_3, bist_4]   # *_eski folders are stale and never read

@@ -1,89 +1,106 @@
-# Veri Sözlüğü — `data/db/bist.sqlite` (snapshot 2026-11-20)
+# Data dictionary — `data/db/bist.sqlite` (snapshot 2026-11-20)
 
-Tüm zamansal tablolar tek bir **bilgi zamanı** kolonu taşır; bütün okumalar `core/pit.py::PITRepository` üzerinden
-`<bilgi kolonu> <= as_of` (as_of = o günün kapanışı sonrası, `YYYY-MM-DD 23:59:59`) filtresiyle yapılır ve dönüşte
-yeniden doğrulanır (`LookAheadError`). Saatler Europe/Istanbul yerel saatidir. Snapshot `D` yalnızca `D`'den önce
-tamamlanmış/yayımlanmış veriyi içerir. Ham kaynaklar `data/raw/<kaynak>/<D>/` altında sha256 manifest'le dondurulur.
+Every temporal table carries a single **knowledge-time** column. All reads go through `core/pit.py::PITRepository`
+with the filter `<knowledge column> <= as_of` (as_of = after that day's close, `YYYY-MM-DD 23:59:59`) and the result
+is checked again on return (`LookAheadError`). Times are Europe/Istanbul local time. Snapshot `D` contains only data
+completed or published before `D`. Raw sources are frozen under `data/raw/<source>/<D>/` with a sha256 manifest.
 
-| Tablo | Bilgi zamanı | Kaynak | Satır | Ingest komutu |
+| Table | Knowledge time | Source | Rows | Ingest command |
 |---|---|---|---|---|
-| `prices_daily` | `date` (kapanış) | FinTreX price-scraper (birincil) + yfinance (tamamlayıcı) | 96.213 | `ingest prices` |
-| `corporate_actions` | `ex_date` | price-scraper `adj_factor` (bedelsiz/bölünme) + yfinance (temettü) | 312 | `ingest prices` |
-| `price_quality_flags` | `date` (NULL = tarihsiz) | fiyat mutabakatı + kalite kontrolleri | 1.071 | `ingest prices` |
-| `trading_calendar` | `date` | price-scraper çoğunluk takvimi + XU100 | 992 | `ingest prices` |
-| `fundamentals` | `disclosure_datetime` | KAP XBRL "Finansal Rapor" (kapdata dökümü) | 119.969 | `ingest fundamentals` |
-| `fundamental_issues` | `disclosure_datetime` | temel ingest uyarıları | 16 | `ingest fundamentals` |
-| `macro_observations` | `release_datetime` | TCMB (kur, politika faizi, TÜFE tablosu), FRED | 2.624 | `ingest macro` |
-| `news_events` | `published_at` (muhafazakâr) | Bloomberg HT arşivi (yalnız metadata) | 40.780 | `ingest news` |
-| `speech_segments` | `published_at` | (konuşma katmanı, sonraki faz) | 0 | — |
-| `instruments`, `universe_membership` | — (statik) | `config/universe.yaml` | 97 / 126 | `ingest prices` |
-| `ingest_log`, `meta` | — | her ingest'in kimliği, `data_version`, kapsam sonları | — | tümü |
+| `prices_daily` | `date` (close) | FinTreX price-scraper (primary) + yfinance (supplementary) | 96,213 | `ingest prices` |
+| `corporate_actions` | `ex_date` | price-scraper `adj_factor` (bonus issues / splits) + yfinance (dividends) | 312 | `ingest prices` |
+| `price_quality_flags` | `date` (NULL = undated) | price reconciliation + quality checks | 1,071 | `ingest prices` |
+| `trading_calendar` | `date` | price-scraper majority calendar + XU100 | 992 | `ingest prices` |
+| `fundamentals` | `disclosure_datetime` | KAP XBRL "Financial Report" filings (kapdata dump) | 119,969 | `ingest fundamentals` |
+| `fundamental_issues` | `disclosure_datetime` | fundamentals ingest warnings | 16 | `ingest fundamentals` |
+| `macro_observations` | `release_datetime` | CBRT (FX, policy rate, CPI table), FRED | 2,624 | `ingest macro` |
+| `news_events` | `published_at` (conservative) | Bloomberg HT archive (metadata only) | 40,780 | `ingest news` |
+| `speech_segments` | `published_at` | speech/video layer (`feature/speech-layer`) | 0 in the release DB | `ingest speech` |
+| `speech_claims` | `published_at` | human-approved speech claims (speech layer) | created by `ingest speech --include-reviews` | `ingest speech` |
+| `instruments`, `universe_membership` | — (static) | `config/universe.yaml` | 97 / 126 | `ingest prices` |
+| `ingest_log`, `meta` | — | identity of every ingest, `data_version`, coverage ends | — | all |
 
 ## prices_daily
-| Kolon | Açıklama |
-|---|---|
-| `ticker`, `date` | anahtar; yalnızca doğrulanmış BIST işlem günleri |
-| `open`, `high`, `low`, `close` | o gün **basılan** (ham) fiyatlar, TL |
-| `volume` | basılan hisse adedi (price-scraper; değilse yfinance ciro korumalı) |
-| `cum_factor` | kümülatif düzeltme faktörü (bölünme/bedelsiz × temettü); son gün = 1 |
-| `price_source` | `price_scraper` / `yfinance` / `price_scraper_raw` (günün seviyesi hangi kaynaktan) |
-| `factor_source` | faktörün kaynağı |
 
-Okuma (`PITRepository.prices`): `adj_t = raw_t · cum_factor_t / cum_factor_asof` — **as_of'a çapalı**, böylece as_of
-sonrasındaki kurumsal işlemler hiçbir çıktıyı değiştirmez; getiriler temettü dahil (hocanın `auto_adjust=True` tanımı).
-Hacim ciro korumalı ölçeklenir. Ham kolonlar `raw_*` olarak da döner.
-
-## fundamentals (rapor-merkezli uzun format)
-| Kolon | Açıklama |
+| Column | Description |
 |---|---|
-| `fiscal_period` | değerin ait olduğu mali çeyrek (şirket mali takvimi; MAVI'de mali yıl Ocak'ta biter) |
-| `period_start`, `period_end`, `duration` | akımlar: `3M` çeyrek / `6M`,`9M`,`12M` yılbaşından kümülatif (KAP gibi); bilanço: `instant` |
-| `report_period`, `disclosure_index` | değeri yayımlayan rapor ve KAP bildirim no (`kap.org.tr/tr/Bildirim/<no>`) |
-| `role` | `current` = kendi raporundaki değer; `prior` = sonraki raporun karşılaştırmalı kolonu |
+| `ticker`, `date` | key; verified BIST trading days only |
+| `open`, `high`, `low`, `close` | prices **as printed** that day (raw), TRY |
+| `volume` | shares traded as printed (price-scraper; otherwise yfinance, turnover-preserving) |
+| `cum_factor` | cumulative adjustment factor (split / bonus issue × dividend); last day = 1 |
+| `price_source` | `price_scraper` / `yfinance` / `price_scraper_raw` (which source set the day's level) |
+| `factor_source` | source of the factor |
+
+Read path (`PITRepository.prices`): `adj_t = raw_t · cum_factor_t / cum_factor_asof` — **anchored to as_of**, so
+corporate actions after as_of change no output; returns include dividends (the instructor's `auto_adjust=True`
+definition). Volume is scaled so that turnover is preserved. The raw columns are also returned as `raw_*`.
+
+## fundamentals (report-centred long format)
+
+| Column | Description |
+|---|---|
+| `fiscal_period` | fiscal quarter of the value (company fiscal calendar; MAVI's fiscal year ends in January) |
+| `period_start`, `period_end`, `duration` | flows: `3M` quarter / `6M`, `9M`, `12M` cumulative from the start of the year (as on KAP); balance sheet: `instant` |
+| `report_period`, `disclosure_index` | the report that published the value and its KAP disclosure number (`kap.org.tr/tr/Bildirim/<no>`) |
+| `role` | `current` = value in its own report; `prior` = comparative column of a later report |
 | `scope` | `consolidated` / `solo` |
-| `statement`, `metric` | `balance`/`income`/`cashflow`; kanonik metrik adı (`config/fundamentals.yaml`) |
-| `value`, `unit` | TL'ye normalize edilmiş değer (gider kalemleri negatif) |
-| `tms29_adjusted` | rapor enflasyon muhasebesine göre yeniden ifade edilmiş mi (veriden tespit) |
-| `source_ref` | `kap:<bildirim>#<XBRL kalem(ler)i>` — kanıt izlenebilirliği |
+| `statement`, `metric` | `balance` / `income` / `cashflow`; canonical metric name (`config/fundamentals.yaml`) |
+| `value`, `unit` | value normalised to TRY (expense items negative) |
+| `tms29_adjusted` | whether the report is restated under hyperinflation accounting (TMS 29 / IAS 29; detected from the data) |
+| `source_ref` | `kap:<disclosure>#<XBRL item(s)>` — evidence traceability |
 
-PIT okuma varsayılanı `role="current"`: her değer ilk yayımlandığı haliyle (+ o raporun KAP düzeltmeleri, ayrı
-sürüm). TMS 29 ile yeniden ifade edilmiş karşılaştırmalar `role=None` ile görülür. Oranlar (F/K, PD/DD, marjlar,
-net borç) burada saklanmaz; analitik katmanda as_of fiyatı × as_of'ta bilinen bilanço ile hesaplanır.
+The PIT default is `role="current"`: every value as first published (plus that report's KAP corrections, kept as
+separate versions). Comparatives restated under TMS 29 are visible with `role=None`. Ratios (P/E, P/B, margins, net
+debt) are not stored here; the analytics layer computes them from the as_of price and the statements known at as_of.
 
-Formatlar ve metrikler (`config/fundamentals.yaml`):
-- `tfrs` (sanayi/holding/GYO/aracı kurum): revenue, cost_of_sales, gross_profit, marketing/admin/rnd_expense,
+Statement formats and metrics (`config/fundamentals.yaml`):
+- `tfrs` (industrials / holdings / REITs / brokers): revenue, cost_of_sales, gross_profit, marketing/admin/rnd_expense,
   other_operating_income/expense, operating_profit, finance_income/costs, net_monetary_position, profit_before_tax,
   tax_expense, net_income, net_income_parent, depreciation_amortization, operating_cash_flow, capex, dividends_paid,
   total_assets, current/noncurrent_assets, cash, trade_receivables, inventories, current/noncurrent_liabilities,
   total_liabilities, total_equity, equity_parent, issued_capital, financial_debt.
-- `bank` (BDDK): interest_income/expense, net_interest_income, net_fee_commission_income, trading_income,
+- `bank` (BRSA): interest_income/expense, net_interest_income, net_fee_commission_income, trading_income,
   gross_operating_profit, expected_credit_losses, personnel_expense, other_operating_expense, operating_profit,
   net_income(_parent), total_assets, cash, loans, deposits, total_equity, issued_capital.
-- `insurance` (SEDDK): gross_written_premiums, technical_balance, investment_income, profit_before_tax,
+- `insurance` (IPSRA): gross_written_premiums, technical_balance, investment_income, profit_before_tax,
   net_income(_parent), operating_cash_flow, total_assets, current_assets/liabilities, cash, total_equity, issued_capital.
 
-Bilinen durumlar: TRALT için KAP verisi yok; YKBNK `issued_capital` banka kolon onarımını geçemiyor (16 uyarı);
-kapsam sonu `meta.fundamentals_coverage_end` = 2026-10-02 19:56:09 (2026Ç3 raporları yok).
+Known gaps: no KAP data for TRALT; YKBNK `issued_capital` fails the bank column repair (16 warnings); coverage end
+`meta.fundamentals_coverage_end` = 2026-10-02 19:56:09 (no 2026 Q3 reports).
 
 ## macro_observations
-| `series_code` | Birim | Kaynak | `release_datetime` kuralı |
+
+| `series_code` | Unit | Source | `release_datetime` rule |
 |---|---|---|---|
-| `USDTRY`, `EURTRY` | TL | TCMB gösterge döviz alış kuru (günlük XML) | bülten günü 15:30 |
-| `TCMB_POLICY_RATE` | % | TCMB 1 hafta repo tablosu (yürürlük tarihli) | yürürlük günü 00:00 (≤1 gün muhafazakâr) |
-| `FED_TARGET_UPPER`, `FED_TARGET_LOWER` | % | FRED DFEDTARU / DFEDTARL (yalnız değişim noktaları) | yürürlük günü 00:00 |
-| `TUFE_YOY`, `TUFE_MOM` | % | TÜİK TÜFE (TCMB tablosu), `obs_date` = ayın ilk günü | sonraki ayın 3'ü veya sonraki ilk işlem günü 10:00 |
+| `USDTRY`, `EURTRY` | TRY | CBRT indicative FX buying rate (daily XML) | bulletin day 15:30 |
+| `TCMB_POLICY_RATE` | % | CBRT one-week repo table (dated by effective day) | effective day 00:00 (at most 1 day conservative) |
+| `FED_TARGET_UPPER`, `FED_TARGET_LOWER` | % | FRED DFEDTARU / DFEDTARL (change points only) | effective day 00:00 |
+| `TUFE_YOY`, `TUFE_MOM` | % | TurkStat CPI (CBRT table), `obs_date` = first day of the month | 3rd of the following month or the next trading day, 10:00 |
 
-Seviye serileri (politika faizi, Fed) basamak fonksiyonudur: t anındaki değer = `release_datetime <= t` olan son gözlem.
+Level series (policy rate, Fed) are step functions: the value at time t = the last observation with
+`release_datetime <= t`.
 
-## news_events (yalnız metadata, metin yok)
-| Kolon | Açıklama |
+## news_events (metadata only, no article text)
+
+| Column | Description |
 |---|---|
-| `published_at` | **bilgi zamanı** = max(ilk yayın, son düzenleme): arşivdeki metin sonradan düzenlenmiş olabilir |
-| `first_published_at` | ilk yayın zamanı (yalnız gösterim) |
-| `title`, `url`, `source` | başlık, kaynak bağlantısı (`bloomberght`) |
-| `tickers` | JSON liste; başlıkta alias, gövdede kod ya da ≥2 alias geçişi (`config/news.yaml`); gündem özetlerinde yalnız başlık |
-| `topics`, `event_type` | deterministik konu etiketleri; `event_type` = öncelik sırasındaki ilk konu (earnings > dividend > …) |
+| `published_at` | **knowledge time** = max(first publication, last edit): the archived text may have been edited later |
+| `first_published_at` | first publication time (display only) |
+| `title`, `url`, `source` | headline and source link (`bloomberght`) |
+| `tickers` | JSON list; an alias in the headline, or the code or at least two alias mentions in the body (`config/news.yaml`); market-summary pages count headline matches only |
+| `topics`, `event_type` | deterministic topic tags; `event_type` = the first topic in priority order (earnings > dividend > …) |
 
-Haber yalnızca bağlamsal kanıttır: sayısal verinin yerine geçmez; içindeki sayılar deterministik araçlarla
-doğrulanmadan committed evidence'a giremez. Ticker etiketi olan makale: 847 (30 hisse); "Piyasa özeti" gibi
-çok hisse listeleyen özet sayfaları yalnız başlık eşleşmesi tutar. Konu etiketleri anahtar-kelime tabanlıdır (kaba).
+News is contextual evidence only: it never replaces numerical data, and numbers inside it cannot enter the committed
+evidence without verification by deterministic tools. Articles with at least one stock tag: 1,641 (96 stocks; tagging
+precision in `reports/news_tagging_audit.md`). Summary pages listing many codes keep headline matches only. Topic tags
+are keyword-based (coarse).
+
+## speech_segments and speech_claims (speech layer)
+
+`speech_segments` holds 60-second transcript segments of a fixed list of public finance videos
+(`data/manual/videos.csv`): `source_id`, `segment_start`, `segment_end`, `published_at` (video publication time; for live
+streams the end of the broadcast), `url`, `speaker`, `channel`, `text`, `topics`, `stance`, `quality` (1 − word error rate
+of the captions against an official text) and `ingest_id`. Transcripts are pasted from YouTube's own transcript panel
+and are not committed to git, so the table is empty in the released database. `speech_claims` holds claims extracted
+by the local model and approved by a human, dated by the video's publication time; it is created by
+`ingest speech --include-reviews`.

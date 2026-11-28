@@ -82,6 +82,9 @@ class HarnessConfig:
     memory: EpisodicMemory | None = None
     reviewer: Reviewer | None = None
     policy: Policy | None = None
+    # UI hook: called with ("start" | "end", state, record) around every state. Display only: it receives the live
+    # record, never changes the run, and an exception in it is logged and ignored.
+    progress: Callable[[str, HarnessState, StateRecord], None] | None = None
 
 
 @dataclass
@@ -232,6 +235,7 @@ class _Run:
         decision_id: str | None = None
         for state in self.policy.states:
             rec = StateRecord(state, StateStatus.DONE)
+            self.notify("start", state, rec)
             reason = self.policy.skip_reason(req.scenario, state)
             if state in ANALYSIS_STATES and state not in self.policy.mandatory and (reason or self.hard_blocked):
                 rec.status = StateStatus.SKIPPED_NOT_APPLICABLE
@@ -307,7 +311,16 @@ class _Run:
                 self.mem.log_state(
                     self.aid, len(self.states), state.value, rec.status.value, rec.reason, len(rec.calls)
                 )
+            self.notify("end", state, rec)
         return self.result(explanation, decision_id, review)
+
+    def notify(self, event: str, state: HarnessState, rec: StateRecord) -> None:
+        if self.cfg.progress is None:
+            return
+        try:
+            self.cfg.progress(event, state, rec)
+        except Exception:  # a display hook must never break or alter an analysis
+            log.exception("progress hook failed at %s %s", event, state.value)
 
     def calls_so_far(self) -> list[CallRecord]:
         return [c for s in self.states for c in s.calls]

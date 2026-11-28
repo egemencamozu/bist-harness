@@ -14,10 +14,12 @@ import pandas as pd
 from pydantic import Field
 
 from bistharness.analytics import macro_stats
+from bistharness.analytics.claims import Verdict
 from bistharness.core import formatting as fmt
-from bistharness.core.enums import Severity, ToolStatus, WarningCode
+from bistharness.core.enums import Severity, WarningCode
 from bistharness.tools import common
 from bistharness.tools.base import ToolContext, ToolInput, ToolInputError, ToolOutput, tool, warn
+from bistharness.tools.speech_verification import verify_claim
 
 MACRO_CODES = ("USDTRY", "EURTRY", "TCMB_POLICY_RATE", "FED_TARGET_UPPER", "FED_TARGET_LOWER", "TUFE_YOY", "TUFE_MOM")
 # must equal the topic keys of config/news.yaml (tests/test_tools.py checks it)
@@ -351,21 +353,29 @@ class SpeechInput(ToolInput):
 
 @tool(
     "get_speech_features",
-    version="1.0.0",
+    version="1.2.1",
     input_model=SpeechInput,
-    sources=("speech",),
+    sources=("speech", "fundamentals", "macro", "prices"),
     description="Timestamped transcript segments of selected public finance videos (URL, channel, segment range, "
-    "topics, stance, quality) published up to as_of_date. Expert opinion is context, not ground truth.",
+    "topics, stance, quality) up to as_of_date, with human-approved claims and deterministic checks.",
 )
 def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
     key = inp.source_id_or_topic.strip()
     if not key:
         raise ToolInputError("source_id_or_topic is required")
     by_source = ctx.repo.speech_segments(as_of=inp.as_of_date, source_id=key).data
-    df = by_source if not by_source.empty else ctx.repo.speech_segments(as_of=inp.as_of_date, topic=key).data
+    df = (
+        by_source
+        if not by_source.empty
+        else ctx.repo.speech_segments(
+            as_of=inp.as_of_date, topic=key, include_claim_subject=key in ctx.universe.instruments
+        ).data
+    )
     if df.empty:
+        # Speech is optional context (CLAUDE.md §4: missing news/speech = soft warning). Most tickers have no video,
+        # so INSUFFICIENT_DATA here would push every analysis gate to INVESTIGATE.
         w = warn(WarningCode.SPEECH_NOT_AVAILABLE, f"no transcribed segment for {key!r} published by {inp.as_of_date}")
-        return ToolOutput({"query": key, "segments": []}, [w], status=ToolStatus.INSUFFICIENT_DATA)
+        return ToolOutput({"query": key, "segments": [], "claims": []}, [w])
     warnings = []
     low = df[df["quality"].fillna(0) < 0.6]
     if len(low):
@@ -392,4 +402,40 @@ def get_speech_features(ctx: ToolContext, inp: SpeechInput) -> ToolOutput:
         )
         for r in segs.itertuples()
     ]
-    return ToolOutput({"query": key, "segments": segs.drop(columns=["text"])}, warnings, evidence=ev)
+    approved = ctx.repo.speech_claims(as_of=inp.as_of_date, source_id=key if not by_source.empty else None).data
+    segment_keys = set(zip(df["source_id"], df["segment_start"], strict=True))
+    claims = [
+        {**claim, "verification": verify_claim(ctx, claim, inp.as_of_date)}
+        for claim in approved.astype(object).where(approved.notna(), None).to_dict("records")
+        if (claim["source_id"], claim["segment_start"]) in segment_keys
+        and (not by_source.empty or key not in ctx.universe.instruments or claim["subject"] == key)
+    ]
+    for index, claim in enumerate(claims):
+        check = claim["verification"]
+        status = check["status"]
+        if status not in {Verdict.SUPPORTED, Verdict.CONTRADICTED}:
+            continue
+        result = "destekliyor" if status == Verdict.SUPPORTED else "desteklemiyor"
+        metric = {
+            "revenue_yoy": "yıllık hasılat değişimi",
+            "TCMB_POLICY_RATE": "TCMB politika faizi",
+            "TUFE_YOY": "yıllık TÜFE",
+            "TUFE_MOM": "aylık TÜFE",
+        }.get(check["provenance"].get("metric"), "işlem penceresi getirisi")
+        ev.append(
+            common.evidence(
+                f"speech_check.{claim['subject']}.{claim['claim_id']}",
+                "{subject} için {d} tarihli video iddiası incelendi. Kayıtlardaki {metric} {observed}. "
+                "Bu sonuç iddiayı {result}.",
+                {
+                    "subject": claim["subject"],
+                    "d": fmt.tr_date(claim["published_at"]),
+                    "metric": metric,
+                    "observed": fmt.pct(check["observed_percent"] / 100, decimals=4),
+                    "result": result,
+                },
+                values={"status": status, "provenance": check["provenance"]},
+                pointer=f"/result/claims/{index}/verification",
+            )
+        )
+    return ToolOutput({"query": key, "segments": segs.drop(columns=["text"]), "claims": claims}, warnings, evidence=ev)

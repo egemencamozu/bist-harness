@@ -143,6 +143,10 @@ class Tagger:
             n += self.names[ticker].count(ex.sub(" ", low) if ex else low)
         return n
 
+    def mentions(self, ticker: str, text: str) -> int:
+        """Name / exact-token mentions of `ticker` in free text (exclusions applied)."""
+        return self._mentions(ticker, text, tr_lower(text))
+
     def in_title(self, ticker: str, title: str) -> bool:
         return self._mentions(ticker, title, tr_lower(title)) > 0
 

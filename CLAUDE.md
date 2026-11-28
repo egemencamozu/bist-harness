@@ -99,7 +99,7 @@ Project/
 │  ├─ tools/      15 MCP aracı: girdi doğrula → PIT oku → analytics çağır → ToolEnvelope döndür (ince katman)
 │  ├─ mcp_server/ server.py (mcp.server.fastmcp)
 │  ├─ harness/    state_machine · policy · evidence · risk_gate · validator · memory · replay · llm_client (Ollama)
-│  └─ ui/         Streamlit HITL arayüzü
+│  └─ ui/web/     FinTreX Analyst: Starlette JSON API + statik tek sayfa ön yüz (HITL, replay)
 ├─ training/      generate_dataset.py · train_qlora.py · export_gguf.py · Modelfile
 ├─ eval/          golden_questions.json · run_golden.py · ablation.py · metrics.py
 ├─ reference/instructor/   hocanın S2/S3 scriptlerinin salt-okunur kopyaları (parity testleri için)
@@ -387,7 +387,7 @@ Evidence ID'leri deterministik atanır (state sırası → araç → anahtar).
   uv run python -m bistharness.harness run --as-of 2026-09-10 --question "ASELS'te alt Bollinger ..." [--explainer llm]
   uv run python -m bistharness.harness list | replay --decision D-... [--llm] | review --decision D-... --verdict ACCEPT --reason "..."
   uv run python -m eval.run_golden --explainer template|llm [--model qwen2.5:7b] [--out reports/golden.json]
-  uv run streamlit run src/bistharness/ui/app.py
+  uv run python -m bistharness.ui.web          # FinTreX Analyst arayüzü, http://127.0.0.1:8501
   ```
 
 ## 13. Proje dışındaki mevcut varlıklar (salt okunur)
@@ -527,6 +527,48 @@ Verilen kararlar (2026-11-20):
   ayrı GPU ortamında `training/train_qlora.py --pilot-steps 20` ile gerçek süre ölçümü (4B yerelde / 9B bulutta
   kararı) → tam eğitim → GGUF → Ollama → `eval.bakeoff` ile önce/sonra karşılaştırması.
 
+- **Konuşma katmanı (2026-11-23, branch `feature/speech-layer`, kullanıcı onayı):** liste `data/manual/videos.csv`
+  (7 video, deneylerden önce sabit): Mete Üstündağ / FİNANS VE BORSA ×5 (2026-01-21 – 2026-03-07; bilanço, sektör,
+  para girişi, yabancı akışı, BofA alımı → doğrulanır / kısmen / doğrulanamaz örnekleri) + TCMB Karahan ER 2026-III
+  (13.08.2026) + FOMC Warsh (29.07.2026). Damodaran kullanıcı kararıyla çıkarıldı. Metin = YouTube'un kendi
+  "Transkripti göster" paneli elle kopyalanır (indirme / yt-dlp YOK, platform koruması aşılmaz); resmi metinler
+  altyazı kelime hata oranını ölçer (`speech.aligned_wer`), FB videoları TCMB'nin ölçülen kalitesini ödünç alır.
+  Transkript `.txt`'leri git'e girmez. Ingest `data/ingest/speech.py` (docstring tek doğruluk kaynağı). Sonraki adım:
+  iddia çıkarma (yerel LLM önerir, sayı metinde birebir geçmeli) + araçlarla doğrulama (yeni araç = imza değişikliği
+  → kullanıcı onayı).
+
+- **Arayüz (2026-11-27, kullanıcı kararı "ayrı arayüz", ürün adı FinTreX Analyst):** Streamlit arayüzü kaldırıldı →
+  `ui/web/` (server.py docstring'i tek doğruluk kaynağı): Starlette JSON API + CDN'siz statik ön yüz (plotly.js kurulu
+  paketten servis edilir), canlı 17 adım akışı (`HarnessConfig.progress` kancası; yalnız gösterim, analizi değiştirmez),
+  E# tıklanabilir kanıt kartları, PIT fiyat grafiği, backtest, validator denetimi, insan onayı, replay ve "Nasıl çalışır"
+  sayfası (rakamlar `reports/` dosyalarından okunur, elle yazılmaz). Görsel dil: kâğıt/mürekkep + tek sinyal rengi,
+  Instrument Serif / Geist / Geist Mono (OFL, `static/fonts/` içine gömülü; ağdan yazı tipi yüklenmez). Varsayılan 127.0.0.1:8501, aynı anda tek işlem
+  (409). Sunum için derin bağlantı: `#/?golden=Q3&explainer=template&planner=scenario&bolum=backtest`;
+  `--memory <dosya>` ile ayrı karar kaydı. Docker CMD de bu arayüz.
+
+- **S1 karşılaştırma grubu (2026-11-27, kullanıcı kararı):** sektör kıyası artık sorudaki hisselerle değil, hissenin
+  TÜM sektörüyle (`universe.yaml: peer_groups`) yapılır. Örnek: "Migros ve Şok sektörünün gerisinde mi?" → Perakende
+  (BIMAS, MGROS, SOKM, MAVI). İki planlayıcı da araca grup adını verir; modelin hisse listesi öneren çağrısı aynı
+  gruba çevrilir (`planner.sector_groups` / `canonical_sector_calls`, testli). Araç imzası değişmedi. Etki: golden Q1
+  HOLD → INVESTIGATE (şablonla 5/5 geçiyor), Q2–Q5 birebir aynı. `reports/golden_final.json` ve S1 içeren ablasyon/
+  dayanıklılık koşuları bu değişiklikten ÖNCEKİ davranışı yansıtır → final golden LLM ile yeniden koşulmalı.
+
+- **Faz 7 raporları (2026-11-27):** `eval/scenario_reports.py` (docstring tek doğruluk kaynağı) golden soruları harness'tan
+  geçirip `reports/scenarios/` altına S1, S2, S3, S4, makro ve backtest raporlarını + `fig/` grafiklerini üretir; her sayı
+  araç zarfından, ekte call_id ve veri sürümü, koşular `episodic_q*.sqlite` (replay). Kıyas için tüm 30 hisse/sektör
+  taraması aynı snapshot'tan. matplotlib `report` ekstrası. Komut: `uv run --extra report python -m eval.scenario_reports
+  s1 s2 s3 s4 macro backtest`. Getiri FARKLARI "pp" (yüzde puan) ile yazılır.
+- **Rapor dili (2026-11-28, kullanıcı kararı):** TÜM raporlar ve teslimler İNGİLİZCE (senaryo raporları, veri sözlüğü,
+  haber denetimi, final teknik rapor, sunum). Sayı biçimi İngilizce (12.35%, 1,234.5, ISO tarih). Ürünün kendisi
+  (arayüz, model açıklamaları) Türkçe kalır; raporlar sistemin Türkçe metnini alıntılamaz, kararı İngilizce özetler.
+  Haber denetimindeki başlıklar kaynak gösterimi olduğu için orijinal Türkçe kalır.
+
+- **Final teknik rapor (2026-11-28):** `reports/final/FinTreX_Analyst_Technical_Report.docx` + `.pdf` (İngilizce, 32 sayfa).
+  Üretim: `uv run --extra report python reports/final/build/make_figures.py` (şekiller + `data.json`, sayılar
+  `reports/` dosyalarından) → `node reports/final/build/build_report.js` (docx-js; `npm install` aynı klasörde) →
+  `powershell -File reportsinaluild	o_pdf.ps1` (Word: içindekiler güncellenir, PDF dışa aktarılır).
+  Bulgular senaryo raporlarının "Key findings"inden kopyalanır. Yazarlar: Egemen Çamözü (20220808076), Batuhan Erdem (20230808611).
+
 Açık:
 1. (kapandı) Makro anahtarsız çözüldü — §11.
-2. Video listesinin somut içeriği (konuşma katmanına gelince önerilecek).
+2. (kapandı) Video listesi — yukarıda.

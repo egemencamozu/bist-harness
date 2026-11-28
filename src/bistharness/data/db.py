@@ -164,6 +164,27 @@ CREATE TABLE IF NOT EXISTS speech_segments (
     PRIMARY KEY (source_id, segment_start)
 );
 
+CREATE TABLE IF NOT EXISTS speech_claims (
+    claim_id          TEXT PRIMARY KEY,
+    source_id         TEXT NOT NULL,
+    segment_start     REAL NOT NULL,
+    published_at      TEXT NOT NULL,
+    segment_sha256    TEXT NOT NULL,
+    extraction_sha256 TEXT NOT NULL,
+    subject           TEXT NOT NULL,
+    claim_type        TEXT NOT NULL,
+    quote             TEXT NOT NULL,
+    quoted_numbers    TEXT NOT NULL,
+    metric            TEXT,
+    direction         TEXT NOT NULL,
+    horizon_days      INTEGER,
+    stance            TEXT NOT NULL,
+    certainty         TEXT NOT NULL,
+    review_note       TEXT NOT NULL,
+    ingest_id         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_speech_claim_pub ON speech_claims(published_at);
+
 CREATE TABLE IF NOT EXISTS ingest_log (
     ingest_id       TEXT PRIMARY KEY,
     source          TEXT NOT NULL,

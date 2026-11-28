@@ -13,14 +13,14 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from bistharness.core.calendar import TradingCalendar
-from bistharness.core.dates import as_of_end_of_day, fmt_date, require_as_of, to_date
+from bistharness.core.dates import as_of_end_of_day, fmt_date, knowledge_bound, require_as_of, to_date
 from bistharness.core.enums import Severity, WarningCode
 from bistharness.core.errors import DataNotFoundError, LookAheadError
 from bistharness.core.schemas import WarningItem
@@ -232,6 +232,7 @@ class PITRepository:
         role: str | None = "current",
         durations: Sequence[str] | None = None,
         latest_only: bool = True,
+        knowledge_cutoff: datetime | None = None,
     ) -> PITFrame:
         """Fundamental values disclosed on KAP up to as_of (knowledge time = disclosure_datetime).
 
@@ -244,7 +245,7 @@ class PITRepository:
         a = require_as_of(as_of)
         s, e, warnings = self._clamp(start, end, a)
         assert e is not None
-        bound = as_of_end_of_day(a)
+        bound = knowledge_bound(a, knowledge_cutoff)
         params: list[Any] = [ticker, f"{fmt_date(e)} 23:59:59", bound]
         sql = (
             f"SELECT {self._FUND_COLS} FROM fundamentals "
@@ -310,13 +311,21 @@ class PITRepository:
         return None if row is None else str(row[0])
 
     # ------------------------------------------------------------------ macro
-    def macro(self, series_codes: Sequence[str] | str, start: Any = None, end: Any = None, *, as_of: Any) -> PITFrame:
+    def macro(
+        self,
+        series_codes: Sequence[str] | str,
+        start: Any = None,
+        end: Any = None,
+        *,
+        as_of: Any,
+        knowledge_cutoff: datetime | None = None,
+    ) -> PITFrame:
         """Latest released value (<= as_of) per (series, observation date). start/end filter obs_date."""
         a = require_as_of(as_of)
         codes = [series_codes] if isinstance(series_codes, str) else list(series_codes)
         s, e, warnings = self._clamp(start, end, a)
         assert e is not None
-        bound = as_of_end_of_day(a)
+        bound = knowledge_bound(a, knowledge_cutoff)
         params: list[Any] = [*codes, fmt_date(e), bound]
         sql = (
             "SELECT series_code, obs_date, value, release_datetime, source, source_ref FROM macro_observations "
@@ -371,7 +380,20 @@ class PITRepository:
         return PITFrame(data=df, as_of=a, start=s, end=e, warnings=warnings)
 
     # ------------------------------------------------------------------ speech
-    def speech_segments(self, *, as_of: Any, source_id: str | None = None, topic: str | None = None) -> PITFrame:
+    def _has_speech_claims(self) -> bool:
+        return (
+            self._conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'speech_claims'").fetchone()
+            is not None
+        )
+
+    def speech_segments(
+        self,
+        *,
+        as_of: Any,
+        source_id: str | None = None,
+        topic: str | None = None,
+        include_claim_subject: bool = False,
+    ) -> PITFrame:
         """Transcribed video segments published up to as_of (knowledge time = video publication time)."""
         a = require_as_of(as_of)
         bound = as_of_end_of_day(a)
@@ -384,8 +406,34 @@ class PITRepository:
             sql += " AND source_id = ?"
             params.append(source_id)
         if topic:
-            sql += " AND topics LIKE ?"
+            sql += " AND (topics LIKE ?"
             params.append(f'%"{topic}"%')
+            if include_claim_subject and self._has_speech_claims():
+                sql += (
+                    " OR EXISTS (SELECT 1 FROM speech_claims AS c WHERE c.source_id = speech_segments.source_id "
+                    "AND c.segment_start = speech_segments.segment_start AND c.subject = ? AND c.published_at <= ?)"
+                )
+                params.extend((topic, bound))
+            sql += ")"
         df = self._read(sql + " ORDER BY published_at, source_id, segment_start", params)
         self._post_check(df, "published_at", bound, "speech_segments")
         return PITFrame(data=df, as_of=a, start=None, end=a)
+
+    def speech_claims(self, *, as_of: Any, source_id: str | None = None) -> PITFrame:
+        """Return human-approved records using the source video's publication date."""
+        a = require_as_of(as_of)
+        bound = as_of_end_of_day(a)
+        columns = (
+            "claim_id, source_id, segment_start, published_at, subject, claim_type, quote, "
+            "quoted_numbers, metric, direction, horizon_days, stance, certainty, review_note"
+        )
+        if not self._has_speech_claims():
+            return PITFrame(data=pd.DataFrame(columns=columns.split(", ")), as_of=a, start=None, end=a)
+        sql = f"SELECT {columns} FROM speech_claims WHERE published_at <= ?"
+        params: list[Any] = [bound]
+        if source_id is not None:
+            sql += " AND source_id = ?"
+            params.append(source_id)
+        data = self._read(sql + " ORDER BY published_at, source_id, segment_start, claim_id", params)
+        self._post_check(data, "published_at", bound, "speech_claims")
+        return PITFrame(data=data, as_of=a, start=None, end=a)

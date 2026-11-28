@@ -4,6 +4,7 @@ uv run python -m bistharness.data.ingest prices --snapshot 2026-11-20 [--no-down
 uv run python -m bistharness.data.ingest fundamentals --snapshot 2026-11-20
 uv run python -m bistharness.data.ingest macro --snapshot 2026-11-20 [--no-download]
 uv run python -m bistharness.data.ingest news --snapshot 2026-11-20
+uv run python -m bistharness.data.ingest speech --snapshot 2026-11-20
 """
 
 from __future__ import annotations
@@ -29,6 +30,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     m.add_argument("--no-download", action="store_true", help="fail instead of downloading a missing snapshot")
     n = sub.add_parser("news", help="freeze the Bloomberg HT archive and rebuild news_events (metadata only)")
     n.add_argument("--snapshot", required=True, help="snapshot name = first day NOT included (YYYY-MM-DD)")
+    sp = sub.add_parser("speech", help="freeze data/manual/videos.csv + pasted transcripts, rebuild speech_segments")
+    sp.add_argument("--snapshot", required=True, help="snapshot name = first day NOT included (YYYY-MM-DD)")
+    sp.add_argument("--include-reviews", action="store_true", help="freeze and import approved speech claims")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -74,6 +78,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"articles      : {nr.articles}  with tickers: {nr.with_tickers}  {nr.first} -> {nr.last}")
         print(f"per ticker    : {nr.per_ticker}")
         print(f"event types   : {nr.per_event_type}")
+    elif args.cmd == "speech":
+        from bistharness.data.ingest import speech
+
+        sr = speech.run(load_settings(), args.snapshot, include_reviews=args.include_reviews)
+        print(f"ingest_id     : {sr.ingest_id}")
+        print(f"segments      : {sr.segments}")
+        if args.include_reviews:
+            print(f"claims        : {sr.claims}")
+        for v in sr.videos:
+            q = "-" if v.quality is None else f"{v.quality:.1%}"
+            wer = "" if v.wer is None else f"  (WER {v.wer:.1%} vs official text)"
+            state = v.skipped or f"{v.segments} segments, quality {q}{wer}, tickers {v.tickers}"
+            print(f"  {v.source_id:<24} {state}")
     return 0
 
 

@@ -20,12 +20,15 @@ ingest = [
 ]
 mcp = ["mcp[cli]>=1.2"]
 llm = ["ollama>=0.4"]
-ui = ["streamlit>=1.38", "plotly>=5.22"]
+ui = ["plotly>=5.22", "starlette>=0.40", "uvicorn>=0.30"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
     "mypy>=1.11",
     "types-PyYAML",
+]
+report = [
+    "matplotlib>=3.8",
 ]
 
 [build-system]

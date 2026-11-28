@@ -364,3 +364,25 @@ def test_validator_checks_the_kind_of_number_and_accepts_years_of_committed_date
     bad = run("66 girişin %56,06'sı başarılı ve %31 yanlış pozitif (E1).")
     assert not bad.ok and bad.bad_numbers == [31.0]
     assert not run("2019 yılından beri 66 giriş (E1).").ok
+
+
+# ----------------------------------------------------------------------------------------------- S1 sector = peer group
+def test_sector_comparison_uses_the_whole_peer_group() -> None:
+    from bistharness.harness.planner import canonical_sector_calls, sector_groups
+
+    u = load_universe()
+    assert sector_groups(["MGROS", "SOKM"], u) == ["Perakende"]
+    assert sector_groups(["BIMAS", "THYAO", "MGROS"], u) == ["Perakende", "Havacilik_Lojistik"]
+    model = [
+        ToolCall("rank_sector_relative_strength", {"sector_or_tickers": ["MGROS", "SOKM"], "horizon": 20}, "llm"),
+        ToolCall("rank_sector_relative_strength", {"sector_or_tickers": "Perakende"}, "llm"),
+        ToolCall("rank_sector_relative_strength", {"sector_or_tickers": ["NOPE1", "NOPE2"]}, "llm"),
+        ToolCall("get_index_history", {}, "llm"),
+    ]
+    out = canonical_sector_calls(model, u)
+    assert out[0] == ToolCall("rank_sector_relative_strength", {"sector_or_tickers": "Perakende", "horizon": 20}, "llm")
+    assert out[1:] == model[1:]  # group names, unknown tickers (rejected later by the tool) and other tools unchanged
+    calls = ScenarioPlanner(POLICY).propose(
+        HarnessState.RUN_SECTOR_RELATIVE_ANALYSIS, _req(Scenario.S1_SECTOR_CATCH_UP, ["MGROS", "SOKM"]), []
+    )
+    assert [c.arguments["sector_or_tickers"] for c in calls] == ["Perakende"]
