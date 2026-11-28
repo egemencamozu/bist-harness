@@ -236,6 +236,11 @@ add(table(["Skill", "Train", "Validation"], [
 ], [50, 25, 25], "Fine-tuning dataset by skill and split."));
 add(H2("8.3 QLoRA training and export"));
 add(P("Training used 4-bit NF4 quantisation with LoRA (r = 16, α = 32), learning rate 2·10⁻⁴ with a cosine schedule, two epochs, effective batch size 16, sequences up to 4,096 tokens and gradient checkpointing, on the same RTX 4070 laptop GPU (8 GB). The run took 716 optimizer steps and 4 h 50 min; the training loss fell from 0.39 to 0.0074 and the validation loss from 0.0102 after epoch 1 to 0.0085 after epoch 2 (no overfitting). The adapter was merged and exported to GGUF Q8_0 (4.5 GB). The llama.cpp converter fused tensors and added a multi-token-prediction block that Ollama 0.40 could not load; a small conversion script disabled the fusion so that the tensor names and shapes match Ollama's own Qwen3.5 build."));
+add(P("**Model identity.** Ollama stores the weights under their SHA-256 hash, and every analysis records the model digest in the episodic memory, so each decision can be traced to the exact model that produced it. The setup scripts refuse a downloaded model whose hash differs."));
+add(P("Weights file `bist-4b-q8_0.gguf` (4,482,403,040 bytes), SHA-256:", { align: AlignmentType.LEFT, para: { spacing: { after: 40, line: 288 } } }));
+add(P("`747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201`", { align: AlignmentType.LEFT, para: { indent: { left: 360 }, spacing: { after: 120, line: 288 } } }));
+add(P("Ollama model `bist-analist` (weights plus temperature 0, seed 42, context 4,096), digest:", { align: AlignmentType.LEFT, para: { spacing: { after: 40, line: 288 } } }));
+add(P("`a4ea6fc7e1b2c4173f43d40ceaab9e2c30db4ca50ce68ed014ddf042af3b1d3a`", { align: AlignmentType.LEFT, para: { indent: { left: 360 }, spacing: { after: 120, line: 288 } } }));
 add(H2("8.4 Grounding free-text questions"));
 add(P("The model proposes and code verifies. A list of company names and sector words maps names in the question to tickers; a ticker the model proposes but the question does not support is removed, a ticker named in the question but missed by the model is added, an explicit advice phrase always routes to the safety scenario, and a question with nothing grounded is declined. This removed the model's early mistakes such as mapping \"Migros\" to MIATK. For S1 the sector comparison always uses the whole peer group of the requested stocks, also when the model proposes a ticker list."));
 
@@ -250,7 +255,7 @@ add(H2("9.2 Effect of fine-tuning"));
 add(P(`On the same 20 evidence bundles the fine-tuned model passed the validator on the first attempt in ${pct(ft.first_attempt_pass)} of the questions versus ${pct(base.first_attempt_pass)} for the base model; it never needed the safe fallback (base: ${pct(1 - base.final_without_fallback)}), invented no number (base: ${pct(base.questions_with_invented_numbers)}), used no forbidden phrase (base: ${pct(base.questions_with_forbidden_phrases)}) and chose the same action as the rule-based teacher in ${pct(ft.teacher_agreement)} of the questions (base: ${pct(base.teacher_agreement)}). The mean time per explanation was ${sec(ft.mean_seconds)} (base ${sec(base.mean_seconds)}). With n = 20, a 100% rate has a Wilson 95% lower bound of about 84%.`));
 add(figure(FIG("fine_tune.png"), "Base versus fine-tuned model on the same 20 evidence bundles."));
 add(H2("9.3 A–E ablation"));
-add(P("The ablation keeps the model and the instruction fixed and changes the infrastructure: A raw LLM without tools; B with MCP tools; C with the stateful harness; D with the committed evidence and the risk gate; E with episodic memory and human review. Each level's answer is checked by the same validator against the evidence that level showed to the model (20 questions, both models)."));
+add(P("The ablation keeps the model and the instruction fixed and changes the infrastructure: A raw LLM without tools; B with MCP tools; C with the stateful harness; D with the committed evidence and the risk gate; E with episodic memory and human review. Each level's answer is checked by the same validator against the evidence that level showed to the model (20 questions, both models). The ablation and the robustness runs (Section 9.4) were made on 2026-11-23, before the S1 sector comparison was switched to the whole peer group (Section 8.4); that change affects only how the sector call of golden question Q1 is planned, and the golden questions were re-run afterwards (Section 9.1)."));
 add(figure(FIG("ablation.png"), "Share of answers with any rule violation at each level."));
 const L = ["A", "B", "C", "D", "E"];
 add(table(["Level", "Violations (fine-tuned / base)", "Invented numbers", "Action not allowed by gate", "Invalid tool calls", "Tool calls / question"],
@@ -348,6 +353,8 @@ add(NUM([
 add(H1("Appendix A. Reproducing the results"));
 add(P("All commands run from the project root with Python 3.12 and uv. The frozen database and the model are published as release assets and installed by the setup scripts, which verify every sha256."));
 add(table(["Purpose", "Command"], [
+  ["Model weights (GGUF Q8_0) SHA-256", "`747068ad68cca49daa750975332c9bf1964363a881c6056ea5f0c88e3dd2a201`"],
+  ["Ollama model digest (bist-analist)", "`a4ea6fc7e1b2c4173f43d40ceaab9e2c30db4ca50ce68ed014ddf042af3b1d3a`"],
   ["Install", "`uv sync --extra dev --extra llm --extra ui --extra mcp --extra report`"],
   ["Download database and model", "`bash setup/get_assets.sh` (macOS/Linux) or `setup\\get_assets.ps1` (Windows)"],
   ["Tests, lint, types", "`uv run pytest -q` · `uv run ruff check .` · `uv run mypy src`"],
@@ -359,7 +366,7 @@ add(table(["Purpose", "Command"], [
   ["This report", "`uv run --extra report python reports/final/build/make_figures.py` then `node reports/final/build/build_report.js`"],
   ["Web interface", "`uv run python -m bistharness.ui.web` → http://127.0.0.1:8501"],
   ["Replay a decision", "`uv run python -m bistharness.harness replay --decision D-… [--llm]`"],
-], [28, 72], "Commands that reproduce the results in this report."));
+], [28, 72], "Model identity and the commands that reproduce the results in this report."));
 
 // ------------------------------------------------------------------ title page + document
 const title = [
